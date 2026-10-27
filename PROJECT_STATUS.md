@@ -21,6 +21,8 @@
 | 11 | Start backend | ✅ Running | `uvicorn main:app --port 8000` — responding on `http://localhost:8000`. |
 | 12 | Start frontend | ✅ Running | Vite v8.3.5 — `http://localhost:5173/` ready in 1028 ms. |
 | 13 | `.gitignore` verification | ✅ Verified | `git status` does NOT show `.env.local` or `backend/.venv/`. |
+| 14 | Initial commit & push to GitHub | ✅ Done | Commit `6ca6109` pushed to `origin/main`. |
+| 15 | Baseten Muse Spark AI Smoke Test | ✅ Verified | `backend/smoke_test.py` passed with reasoning effort low (501 tokens, ~$0.0007). |
 
 ---
 
@@ -106,32 +108,48 @@ FurnitureItem
 
 ---
 
-### ⚠️ Open Items / Next Session
+### 🤖 AI Model Verification (Baseten Muse Spark Open)
 
-1. **Room input form** — wire `RoomInput` schema to a proper React form (not yet built).
-2. **POST `/layout`** — accept `RoomInput`, run deterministic geometry, return arrangement.
-3. **Meta AI smoke test** — verify Meta API credentials, then make exactly one test call from the backend.
-4. **TypeScript type for `RoomInput`** — share schema with frontend via OpenAPI or manual types.
+- **Model ID:** `meta-models/muse-spark-open`
+- **Inference URL:** `https://inference.baseten.co/v1/chat/completions`
+- **Architecture Notes:** 816B parameter reasoning model. Returns thought process before response content.
+- **Configured Request:**
+  - `reasoning_effort`: `"low"`
+  - `reasoning`: `{"max_tokens": 100}`
+  - `max_tokens`: `400`
+- **Smoke Test Result:** PASSED
+  - Response: `"I am ready to help you arrange your room furniture."`
+  - Total tokens: `501` (~$0.0007 cost, well within free credit quota)
+- **Script Location:** `backend/smoke_test.py`
+
+---
+
+### ⚠️ Day 2 Focus / Upcoming Tasks
+
+1. **Room input form** — wire `RoomInput` schema to a clean React form in `frontend/src/App.tsx`.
+2. **Deterministic geometry engine** (`backend/geometry.py`) — AABB bounding boxes, clearance pathways (75-90cm).
+3. **POST `/layout`** — accept `RoomInput`, validate deterministically, return mock/initial placement.
+4. **AI Layout Suggestion Pipeline** (`backend/ai.py`) — integrate Baseten Muse Spark calls with reasoning caps and prompt engineering.
 
 ---
 
 ### 🔑 API Usage This Session
 
-| Provider | Purpose | Calls | Notes |
-|----------|---------|-------|-------|
-| OmniRoute / coding agent | Code scaffolding & edits | Used via IDE | No Meta API called today |
-| Meta Model API | Room layout suggestions | 0 | Reserved for next session after credential confirmation |
+| Provider | Purpose | Calls | Tokens | Cost | Notes |
+|----------|---------|-------|--------|------|-------|
+| OmniRoute / IDE | Code scaffolding & editing | N/A | N/A | N/A | Active local coding session |
+| Baseten (Muse Spark Open) | Smoke test API verification | 1 | 501 | ~$0.0007 | Working cleanly within free credits |
 
 ---
 
 ### 📌 Current Branch & Commit
 
 - **Branch:** `main`
-- **Commits:** None yet (initial files not yet committed)
-- **Staged:** Nothing — awaiting your approval before first commit
+- **Last Commit:** `6ca6109` (Initial commit)
+- **Status:** Day 1 schedule **100% completed**!
 
 ---
 
-### ⏭️ Exact Next Task to Resume
+### ⏭️ Exact Next Task to Resume (Day 2)
 
-> **Task:** Build the Room Input Form in the React frontend (`frontend/src/App.tsx`) that collects room width, room length, and at least one furniture item (name, width, length, height), then displays the validated inputs on screen. No backend call required yet — pure client-side form with TypeScript types matching `RoomInput`.
+> **Task:** Build the Room Input Form in the React frontend (`frontend/src/App.tsx`) that collects room width, room length, and furniture items (name, width, length, height), displaying validated inputs on screen.
