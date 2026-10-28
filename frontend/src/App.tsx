@@ -1,26 +1,174 @@
 import { useState } from 'react'
 import './App.css'
 
+/* ── Types ───────────────────────────────────────────────────────── */
+
+interface FurnitureItem {
+  id: string
+  name: string
+  width: string   // kept as string in the form for easier editing
+  length: string
+  height: string
+}
+
 type HealthStatus = 'idle' | 'checking' | 'healthy' | 'error'
+type SubmitStatus = 'idle' | 'submitting' | 'accepted' | 'error'
+
+const STYLE_OPTIONS = ['minimalist', 'modern', 'traditional', 'cozy', 'industrial'] as const
+
+/* ── Helpers ─────────────────────────────────────────────────────── */
+
+let idCounter = 0
+function nextId(): string {
+  idCounter += 1
+  return `furniture-${idCounter}`
+}
+
+function emptyItem(): FurnitureItem {
+  return { id: nextId(), name: '', width: '', length: '', height: '' }
+}
+
+/** Returns an error string or null if valid. */
+function validateDimension(value: string, label: string, required: boolean): string | null {
+  if (value.trim() === '') return required ? `${label} is required` : null
+  const n = Number(value)
+  if (!Number.isFinite(n)) return `${label} must be a valid number`
+  if (n <= 0) return `${label} must be greater than 0`
+  if (n > 2000) return `${label} must be ≤ 2000 cm`
+  return null
+}
+
+/* ── Component ───────────────────────────────────────────────────── */
 
 export default function App() {
-  const [status, setStatus] = useState<HealthStatus>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
+  // Health check state
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle')
+  const [healthError, setHealthError] = useState('')
+
+  // Room dimensions
+  const [roomWidth, setRoomWidth] = useState('')
+  const [roomLength, setRoomLength] = useState('')
+  const [roomHeight, setRoomHeight] = useState('')
+
+  // Furniture
+  const [furniture, setFurniture] = useState<FurnitureItem[]>([emptyItem()])
+
+  // Preferences
+  const [style, setStyle] = useState('')
+
+  // Submission
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle')
+  const [submitMessage, setSubmitMessage] = useState('')
+
+  /* ── Health check ──────────────────────────────────────────────── */
 
   async function checkHealth() {
-    setStatus('checking')
-    setErrorMsg('')
+    setHealthStatus('checking')
+    setHealthError('')
     try {
-      // Proxied by Vite dev server → http://localhost:8000/health
       const res = await fetch('/api/health')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      setStatus(data.status === 'healthy' ? 'healthy' : 'error')
+      setHealthStatus(data.status === 'healthy' ? 'healthy' : 'error')
     } catch (err) {
-      setStatus('error')
-      setErrorMsg(err instanceof Error ? err.message : 'Unknown error')
+      setHealthStatus('error')
+      setHealthError(err instanceof Error ? err.message : 'Unknown error')
     }
   }
+
+  /* ── Furniture CRUD ────────────────────────────────────────────── */
+
+  function addFurniture() {
+    setFurniture(prev => [...prev, emptyItem()])
+  }
+
+  function updateFurniture(id: string, field: keyof FurnitureItem, value: string) {
+    setFurniture(prev =>
+      prev.map(item => (item.id === id ? { ...item, [field]: value } : item)),
+    )
+  }
+
+  function removeFurniture(id: string) {
+    setFurniture(prev => prev.filter(item => item.id !== id))
+  }
+
+  /* ── Validation ────────────────────────────────────────────────── */
+
+  function getFormErrors(): string[] {
+    const errors: string[] = []
+    const wErr = validateDimension(roomWidth, 'Room width', true)
+    if (wErr) errors.push(wErr)
+    const lErr = validateDimension(roomLength, 'Room length', true)
+    if (lErr) errors.push(lErr)
+    const hErr = validateDimension(roomHeight, 'Room height', false)
+    if (hErr) errors.push(hErr)
+
+    furniture.forEach((item, i) => {
+      const label = `Furniture #${i + 1}`
+      if (!item.name.trim()) errors.push(`${label}: name is required`)
+      const fw = validateDimension(item.width, `${label} width`, true)
+      if (fw) errors.push(fw)
+      const fl = validateDimension(item.length, `${label} depth`, true)
+      if (fl) errors.push(fl)
+      const fh = validateDimension(item.height, `${label} height`, false)
+      if (fh) errors.push(fh)
+    })
+
+    return errors
+  }
+
+  const formErrors = getFormErrors()
+  const isValid = formErrors.length === 0
+
+  /* ── Submit ────────────────────────────────────────────────────── */
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!isValid) return
+
+    const payload = {
+      width: Number(roomWidth),
+      length: Number(roomLength),
+      height: roomHeight.trim() ? Number(roomHeight) : undefined,
+      unit: 'cm',
+      furniture: furniture.map(f => ({
+        id: f.id,
+        name: f.name.trim(),
+        width: Number(f.width),
+        length: Number(f.length),
+        height: f.height.trim() ? Number(f.height) : undefined,
+      })),
+      preferences: style ? { style } : undefined,
+    }
+
+    setSubmitStatus('submitting')
+    setSubmitMessage('')
+    try {
+      const res = await fetch('/api/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        // FastAPI returns { detail: [...] } for 422
+        const detail =
+          Array.isArray(data.detail)
+            ? data.detail.map((d: { msg: string }) => d.msg).join('; ')
+            : data.detail || `HTTP ${res.status}`
+        throw new Error(detail)
+      }
+      setSubmitStatus('accepted')
+      setSubmitMessage(
+        `Room accepted! ${data.summary?.furniture_count ?? 0} furniture item(s) validated.`,
+      )
+    } catch (err) {
+      setSubmitStatus('error')
+      setSubmitMessage(err instanceof Error ? err.message : 'Submission failed')
+    }
+  }
+
+  /* ── Render helpers ────────────────────────────────────────────── */
 
   const statusColour: Record<HealthStatus, string> = {
     idle: '#888',
@@ -29,48 +177,196 @@ export default function App() {
     error: '#ef4444',
   }
 
-  const statusLabel: Record<HealthStatus, string> = {
+  const healthLabel: Record<HealthStatus, string> = {
     idle: 'Not checked yet',
     checking: 'Checking…',
     healthy: '✅ Backend is healthy',
-    error: `❌ Error${errorMsg ? ': ' + errorMsg : ''}`,
+    error: `❌ Error${healthError ? ': ' + healthError : ''}`,
   }
 
-  return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 520, margin: '80px auto', padding: '0 24px' }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: 8 }}>🏠 RoomGenius AI</h1>
-      <p style={{ color: '#555', marginBottom: 32 }}>
-        AI-powered room layout assistant — Day 1 MVP
-      </p>
+  /* ── JSX ───────────────────────────────────────────────────────── */
 
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 24, marginBottom: 24 }}>
-        <h2 style={{ marginTop: 0 }}>Backend Connection</h2>
-        <p style={{ color: statusColour[status], fontWeight: 600, minHeight: 24 }}>
-          {statusLabel[status]}
+  return (
+    <main className="rg-main">
+      <h1 className="rg-title">🏠 RoomGenius AI</h1>
+      <p className="rg-subtitle">AI-powered room layout assistant — Day 2</p>
+
+      {/* Health check */}
+      <section className="rg-card">
+        <h2>Backend Connection</h2>
+        <p style={{ color: statusColour[healthStatus], fontWeight: 600, minHeight: 24 }}>
+          {healthLabel[healthStatus]}
         </p>
         <button
           id="health-check-btn"
+          className="rg-btn rg-btn--secondary"
           onClick={checkHealth}
-          disabled={status === 'checking'}
-          style={{
-            padding: '10px 24px',
-            borderRadius: 8,
-            border: 'none',
-            background: '#3b82f6',
-            color: '#fff',
-            fontSize: '1rem',
-            cursor: status === 'checking' ? 'not-allowed' : 'pointer',
-            opacity: status === 'checking' ? 0.6 : 1,
-          }}
+          disabled={healthStatus === 'checking'}
         >
-          {status === 'checking' ? 'Checking…' : 'Check Backend Health'}
+          {healthStatus === 'checking' ? 'Checking…' : 'Check Backend Health'}
         </button>
       </section>
 
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
-        <h2 style={{ marginTop: 0 }}>Room Input (coming next)</h2>
-        <p style={{ color: '#888' }}>Room dimensions and furniture form will be added here.</p>
-      </section>
+      {/* Room input form */}
+      <form className="rg-card" onSubmit={handleSubmit}>
+        <h2>Room Dimensions</h2>
+        <p className="rg-unit-note">All measurements in centimetres (cm)</p>
+
+        <div className="rg-row">
+          <label className="rg-field">
+            <span>Width (cm) *</span>
+            <input
+              type="number"
+              step="any"
+              min="1"
+              max="2000"
+              placeholder="e.g. 400"
+              value={roomWidth}
+              onChange={e => setRoomWidth(e.target.value)}
+              required
+            />
+          </label>
+          <label className="rg-field">
+            <span>Length (cm) *</span>
+            <input
+              type="number"
+              step="any"
+              min="1"
+              max="2000"
+              placeholder="e.g. 500"
+              value={roomLength}
+              onChange={e => setRoomLength(e.target.value)}
+              required
+            />
+          </label>
+          <label className="rg-field">
+            <span>Height (cm)</span>
+            <input
+              type="number"
+              step="any"
+              min="1"
+              max="500"
+              placeholder="optional"
+              value={roomHeight}
+              onChange={e => setRoomHeight(e.target.value)}
+            />
+          </label>
+        </div>
+
+        {/* Furniture list */}
+        <h2 style={{ marginTop: 32 }}>Furniture Items</h2>
+
+        {furniture.length === 0 && (
+          <p className="rg-empty">No furniture added yet. Click "Add Furniture" below.</p>
+        )}
+
+        {furniture.map((item, i) => (
+          <fieldset key={item.id} className="rg-furniture-card">
+            <legend>#{i + 1}</legend>
+            <div className="rg-row">
+              <label className="rg-field rg-field--wide">
+                <span>Name *</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Sofa"
+                  value={item.name}
+                  onChange={e => updateFurniture(item.id, 'name', e.target.value)}
+                  required
+                />
+              </label>
+              <label className="rg-field">
+                <span>Width (cm) *</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="1"
+                  max="2000"
+                  placeholder="e.g. 200"
+                  value={item.width}
+                  onChange={e => updateFurniture(item.id, 'width', e.target.value)}
+                  required
+                />
+              </label>
+              <label className="rg-field">
+                <span>Depth (cm) *</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="1"
+                  max="2000"
+                  placeholder="e.g. 90"
+                  value={item.length}
+                  onChange={e => updateFurniture(item.id, 'length', e.target.value)}
+                  required
+                />
+              </label>
+              <label className="rg-field">
+                <span>Height (cm)</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="1"
+                  max="500"
+                  placeholder="optional"
+                  value={item.height}
+                  onChange={e => updateFurniture(item.id, 'height', e.target.value)}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="rg-btn rg-btn--danger rg-btn--sm"
+              onClick={() => removeFurniture(item.id)}
+            >
+              Remove
+            </button>
+          </fieldset>
+        ))}
+
+        <button type="button" className="rg-btn rg-btn--secondary" onClick={addFurniture}>
+          + Add Furniture
+        </button>
+
+        {/* Preferences */}
+        <h2 style={{ marginTop: 32 }}>Preferences</h2>
+        <label className="rg-field">
+          <span>Room style</span>
+          <select value={style} onChange={e => setStyle(e.target.value)}>
+            <option value="">— none —</option>
+            {STYLE_OPTIONS.map(s => (
+              <option key={s} value={s}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Validation messages */}
+        {formErrors.length > 0 && (
+          <ul className="rg-errors">
+            {formErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        )}
+
+        {/* Submit */}
+        <button
+          type="submit"
+          className="rg-btn rg-btn--primary"
+          disabled={!isValid || submitStatus === 'submitting'}
+        >
+          {submitStatus === 'submitting' ? 'Submitting…' : 'Submit Room Layout'}
+        </button>
+
+        {/* Submission feedback */}
+        {submitStatus === 'accepted' && (
+          <p className="rg-toast rg-toast--success">{submitMessage}</p>
+        )}
+        {submitStatus === 'error' && (
+          <p className="rg-toast rg-toast--error">{submitMessage}</p>
+        )}
+      </form>
     </main>
   )
 }
