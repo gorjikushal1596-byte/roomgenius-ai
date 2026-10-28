@@ -29,12 +29,12 @@ function emptyItem(): FurnitureItem {
 }
 
 /** Returns an error string or null if valid. */
-function validateDimension(value: string, label: string, required: boolean): string | null {
+function validateDimension(value: string, label: string, required: boolean, max = 2000): string | null {
   if (value.trim() === '') return required ? `${label} is required` : null
   const n = Number(value)
   if (!Number.isFinite(n)) return `${label} must be a valid number`
   if (n <= 0) return `${label} must be greater than 0`
-  if (n > 2000) return `${label} must be ≤ 2000 cm`
+  if (n > max) return `${label} must be ≤ ${max} cm`
   return null
 }
 
@@ -100,7 +100,7 @@ export default function App() {
     if (wErr) errors.push(wErr)
     const lErr = validateDimension(roomLength, 'Room length', true)
     if (lErr) errors.push(lErr)
-    const hErr = validateDimension(roomHeight, 'Room height', false)
+    const hErr = validateDimension(roomHeight, 'Room height', false, 500)
     if (hErr) errors.push(hErr)
 
     furniture.forEach((item, i) => {
@@ -110,7 +110,7 @@ export default function App() {
       if (fw) errors.push(fw)
       const fl = validateDimension(item.length, `${label} depth`, true)
       if (fl) errors.push(fl)
-      const fh = validateDimension(item.height, `${label} height`, false)
+      const fh = validateDimension(item.height, `${label} height`, false, 500)
       if (fh) errors.push(fh)
     })
 
@@ -149,18 +149,18 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok) {
         // FastAPI returns { detail: [...] } for 422
         const detail =
-          Array.isArray(data.detail)
-            ? data.detail.map((d: { msg: string }) => d.msg).join('; ')
-            : data.detail || `HTTP ${res.status}`
+          Array.isArray(data?.detail)
+            ? data.detail.map((d: { msg?: string }) => d?.msg ?? JSON.stringify(d)).join('; ')
+            : (typeof data?.detail === 'string' && data.detail) || `HTTP ${res.status}`
         throw new Error(detail)
       }
       setSubmitStatus('accepted')
       setSubmitMessage(
-        `Room accepted! ${data.summary?.furniture_count ?? 0} furniture item(s) validated.`,
+        `Room accepted! ${data?.summary?.furniture_count ?? 0} furniture item(s) validated.`,
       )
     } catch (err) {
       setSubmitStatus('error')

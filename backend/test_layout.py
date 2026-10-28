@@ -142,6 +142,21 @@ def test_non_finite_width_string():
     assert res.status_code == 422
 
 
+def test_invalid_unit():
+    """Units other than 'cm' are rejected."""
+    payload = {"width": 300, "length": 400, "unit": "inch"}
+    res = client.post("/layout", json=payload)
+    assert res.status_code == 422
+
+
+def test_valid_unit_explicit():
+    """Explicitly passing unit='cm' is accepted."""
+    payload = {"width": 300, "length": 400, "unit": "cm"}
+    res = client.post("/layout", json=payload)
+    assert res.status_code == 200
+    assert res.json()["summary"]["unit"] == "cm"
+
+
 # ── 5. Furniture item validation ────────────────────────────────────
 
 def test_furniture_missing_name():
@@ -155,12 +170,37 @@ def test_furniture_missing_name():
     assert res.status_code == 422
 
 
+def test_furniture_whitespace_name():
+    """Furniture with whitespace-only name is rejected."""
+    payload = {
+        "width": 300,
+        "length": 400,
+        "furniture": [{"id": "f1", "name": "   ", "width": 120, "length": 60}],
+    }
+    res = client.post("/layout", json=payload)
+    assert res.status_code == 422
+
+
 def test_furniture_missing_id():
     """Furniture without an id is rejected."""
     payload = {
         "width": 300,
         "length": 400,
         "furniture": [{"name": "Desk", "width": 120, "length": 60}],
+    }
+    res = client.post("/layout", json=payload)
+    assert res.status_code == 422
+
+
+def test_duplicate_furniture_id():
+    """Furniture items with duplicate IDs are rejected."""
+    payload = {
+        "width": 300,
+        "length": 400,
+        "furniture": [
+            {"id": "chair-1", "name": "Chair 1", "width": 50, "length": 50},
+            {"id": "chair-1", "name": "Chair 2", "width": 50, "length": 50},
+        ],
     }
     res = client.post("/layout", json=payload)
     assert res.status_code == 422

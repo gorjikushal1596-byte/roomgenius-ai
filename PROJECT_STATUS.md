@@ -130,8 +130,12 @@ test_negative_furniture_length ............... PASSED
 test_non_numeric_width ....................... PASSED
 test_infinity_width .......................... PASSED
 test_non_finite_width_string ................. PASSED
+test_invalid_unit ............................ PASSED
+test_valid_unit_explicit ..................... PASSED
 test_furniture_missing_name .................. PASSED
+test_furniture_whitespace_name ............... PASSED
 test_furniture_missing_id .................... PASSED
+test_duplicate_furniture_id .................. PASSED
 test_exceeds_max_dimension ................... PASSED
 test_health_endpoint ......................... PASSED
 ```
@@ -139,8 +143,20 @@ test_health_endpoint ......................... PASSED
 #### Frontend — TypeScript
 ```
 npx tsc --noEmit → 0 errors
-npx vite build → ✅ success (684ms)
+npx vite build → ✅ success
 ```
+
+---
+
+### 🐇 CodeRabbit Review & Remediation
+
+| Issue | Severity | Status | Fix Applied |
+|---|---|---|---|
+| `backend/schemas.py`: Restrict `unit` | Minor | ✅ Fixed | Changed `unit: str` to `Literal["cm"]` |
+| `frontend/src/App.tsx`: Safe response JSON parsing | Minor | ✅ Fixed | Handled empty / non-JSON responses with `.catch(() => null)` |
+| `frontend/src/App.tsx`: 500 cm height validation | Minor | ✅ Fixed | Updated `validateDimension` to enforce 500 cm limit for optional height fields |
+| `backend/schemas.py`: Reject whitespace-only names | Minor | ✅ Fixed | Added validator to strip whitespace and reject blank names |
+| `backend/schemas.py`: Enforce unique furniture IDs | Minor | ✅ Fixed | Added `validate_unique_furniture_ids` validator in `RoomInput` |
 
 ---
 
@@ -148,17 +164,18 @@ npx vite build → ✅ success (684ms)
 
 | Provider | Purpose | Calls | Notes |
 |----------|---------|-------|-------|
-| OmniRoute / IDE (Claude Opus 4.6) | Code scaffolding & editing | Active session | Default coding agent |
+| OmniRoute / IDE (Gemini 3.8 Flash / Claude Opus 4.6) | Code scaffolding & editing | Active session | Default coding agent |
+| CodeRabbit CLI | Code quality & security audit | 2 runs | Findings addressed and re-verified |
 | Baseten (Muse Spark Open) | — | 0 | No Meta API calls made today (credit conservation) |
 
 ---
 
 ### 📌 Current Branch & Commit
 
-- **Branch:** `main`
-- **Last Commit:** `cafb1b3` (Day 1)
-- **Uncommitted changes:** 4 modified files + 1 new file (see above)
-- **Status:** Day 2 core implementation complete, pending user review and commit
+- **Branch:** `day2-room-input`
+- **Commits:**
+  - `51205e1` feat: Day 2 — room input form, POST /layout endpoint, 17 validation tests
+- **Status:** Day 2 implementation & CodeRabbit audit complete, verified with 21 unit tests.
 
 ---
 
