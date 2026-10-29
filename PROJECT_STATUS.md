@@ -1,35 +1,31 @@
 # Project Status – RoomGenius AI
 
-## Day 2 — October 28, 2026 (IST)
+## Day 3 — October 29, 2026 (IST)
 
 ---
 
-### 🔎 Verified Starting State (Day 2)
+### 🔎 Verified Starting State (Day 3 Start)
 
-| Item | Status |
-|------|--------|
-| Git branch | `main`, clean working tree (2 commits: `6ca6109`, `cafb1b3`) |
-| Frontend | Vite + React TS scaffolding in `frontend/`; health-check page renders |
-| Backend | FastAPI in `backend/main.py`; `/health` returns `{ "status": "healthy" }` |
-| Schema | `backend/schemas.py` — **bug found**: trailing comma on line 32 turned `length` into a tuple; fixed today |
-| Python venv | `backend/.venv/` with FastAPI, uvicorn, pydantic installed |
-| Telemetry hook | `googlecloudtools.datacloud_telemetry` plugin was missing; disabled (folder renamed) to unblock tooling |
+| Item | Status | Verified Evidence |
+|------|--------|-------------------|
+| **Git branch** | `day3-layout-engine` (created from `day2-room-input`) | `git status` clean, commit `72b4861` |
+| **Filesystem / Tools** | ✅ Operational | No telemetry errors; commands and file tools execute directly |
+| **Backend** | ✅ Operational | FastAPI app, 21/21 pytest tests passing in `backend/test_layout.py` |
+| **Frontend** | ✅ Operational | React + Vite + TS; `tsc --noEmit` 0 errors, `vite build` successful |
+| **Day 1 & Day 2 Status** | ✅ 100% Complete | Form inputs, furniture CRUD, Pydantic schemas, unit enforcement, CodeRabbit audit resolved |
 
 ---
 
-### ✅ Completed Tasks & Verified Results (Day 2)
+### ✅ Completed Tasks & Verified Results (Day 3)
 
 | # | Task | Status | Evidence |
 |---|------|--------|----------|
-| 1 | Fix `schemas.py` bug (trailing comma on `length` field) | ✅ Done | Fixed; all 17 backend tests pass |
-| 2 | Add `id` field to `FurnitureItem`, make `height` optional | ✅ Done | `schemas.py` updated; tests cover both cases |
-| 3 | Add `unit` field to `RoomInput` (default `"cm"`) | ✅ Done | Schema includes `unit: str = "cm"` |
-| 4 | Create `POST /layout` endpoint | ✅ Done | Returns `{ "status": "accepted", "summary": {...} }` on valid payload; 422 on invalid |
-| 5 | Build Room Input form (React) | ✅ Done | Room width/length/height, furniture CRUD, style preference, validation messages |
-| 6 | Wire frontend → backend via Vite proxy | ✅ Done | POST to `/api/layout` → proxied to `http://localhost:8000/layout`; success/error toasts |
-| 7 | Backend validation tests (`test_layout.py`) | ✅ Done | 17/17 tests pass (pytest) |
-| 8 | Frontend TypeScript check | ✅ Done | `npx tsc --noEmit` passes with 0 errors |
-| 9 | Frontend production build | ✅ Done | `npx vite build` succeeds (684ms, 226 kB JS gzipped to 71 kB) |
+| 1 | **Geometry Primitives & Collision Engine** (`backend/geometry.py`) | ✅ Done | Axis-aligned bounding box (AABB) intersection check, touching edges allowed (`max(x1, x2) < min(x1+w1, x2+w2)`), boundary confinement checks, 0°/90° rotation handling, and floating-point comparison with `EPSILON = 1e-4`. |
+| 2 | **Deterministic Greedy Placement Strategy** (`backend/geometry.py`) | ✅ Done | Footprint area sorting with `id` tie-breaker, candidate anchor generation from room origin `(0,0)` and bottom/right edges of placed items, sequential placement testing 0° then 90°, and structured rejection recording. |
+| 3 | **API Response Schemas & FastAPI Integration** (`backend/schemas.py`, `backend/main.py`) | ✅ Done | Added `PlacedFurnitureItem` and `LayoutResponse` schemas; updated `POST /layout` to execute deterministic layout generation and return placed item coordinates, dimensions, rotation, and rejection reasons. |
+| 4 | **Frontend Placement Result View** (`frontend/src/App.tsx`, `App.css`) | ✅ Done | Rendered layout summary badge (Feasible / Partial), structured table of placed furniture items with coordinates, dimensions, orientation, and warning list for unplaced items. |
+| 5 | **Unit & Integration Test Suite** (`backend/test_geometry.py`, `test_layout.py`) | ✅ Done | **39/39 tests passing** across geometry rules, edge-touching, collision rejection, rotation swap, deterministic repeatability, input validation, and max furniture count. |
+| 6 | **CodeRabbit Review & Verification** | ✅ Done | 2 review runs completed. Finding regarding furniture count cap addressed with `max_length=100`; final fresh verification returned **0 findings**. |
 
 ---
 
@@ -37,16 +33,107 @@
 
 ```
 backend/
-  main.py           ← Updated: added POST /layout endpoint, imported RoomInput
-  schemas.py        ← Updated: fixed bug, added id/unit fields, made height optional
-  test_layout.py    ← NEW: 17 pytest tests for /layout validation
+  geometry.py         ← NEW: Deterministic 2D AABB geometry & layout placement engine
+  schemas.py          ← Updated: Added PlacedFurnitureItem, LayoutResponse; capped furniture list to max 100
+  main.py             ← Updated: POST /layout runs generate_layout and returns LayoutResponse
+  test_geometry.py    ← NEW: 14 unit tests for geometry and placement engine
+  test_layout.py      ← Updated: Added integration tests for layout API response, rotation, and limits (25 tests)
 
 frontend/
-  src/App.tsx       ← Rewritten: full room input form with furniture CRUD
-  src/App.css       ← Rewritten: clean responsive styles for the form
+  src/App.tsx         ← Updated: Integrated LayoutResponseData state & rendered placed/unplaced items
+  src/App.css         ← Updated: Responsive styles for layout results card, table, and status badges
 
-PROJECT_STATUS.md   ← Updated with Day 2 progress
+PROJECT_STATUS.md     ← Updated with Day 3 progress and resume checkpoint
 ```
+
+---
+
+### 📐 Deterministic Layout Algorithm & Limitations
+
+1. **Strategy**:
+   - Items are sorted in descending order of footprint area (`width × length`), with item `id` as a deterministic tie-breaker.
+   - Candidate top-left anchor points are generated from the room origin `(0, 0)`, along with the right edge `(x + w, y)`, bottom edge `(x, y + d)`, and corner `(x + w, y + d)` of all currently placed items.
+   - For each item, candidate points are tested in top-to-bottom, left-to-right order.
+   - The engine evaluates 0° first, then 90°.
+   - An item is placed at the first candidate point where it is fully inside room boundaries and has zero positive-area overlap with existing items.
+2. **Limitations (Documented Truthfully)**:
+   - This is a deterministic greedy packing algorithm designed for fast, predictable floor planning. It does not perform exhaustive NP-hard search, and therefore is not guaranteed to find a layout if a very tight, highly specific arrangement is required.
+   - When an item cannot fit, the engine truthfully marks it as unplaced with an explicit `rejection_reason` rather than fabricating coordinates.
+
+---
+
+### 🧪 Test Results (Day 3)
+
+#### Backend — Pytest (39/39 passed)
+```
+backend/test_geometry.py:
+  test_rotation_swaps_dimensions ................. PASSED
+  test_unsupported_rotation_raises ............... PASSED
+  test_fits_in_boundary .......................... PASSED
+  test_overlapping_rectangles_detected ........... PASSED
+  test_touching_edges_allowed .................... PASSED
+  test_touching_corner_allowed ................... PASSED
+  test_disjoint_rectangles ....................... PASSED
+  test_single_item_placement ..................... PASSED
+  test_multiple_items_placement_no_overlap ....... PASSED
+  test_item_larger_than_room_rejected ............ PASSED
+  test_item_fits_only_with_rotation .............. PASSED
+  test_partial_placement_when_room_crowded ....... PASSED
+  test_layout_is_deterministic ................... PASSED
+  test_invalid_room_dimension_raises ............. PASSED
+
+backend/test_layout.py:
+  test_valid_room_with_furniture ................. PASSED
+  test_layout_api_unplaced_item_reported ......... PASSED
+  test_valid_room_empty_furniture ................ PASSED
+  test_valid_room_with_height .................... PASSED
+  test_missing_width ............................. PASSED
+  test_missing_length ............................ PASSED
+  test_missing_both_dimensions ................... PASSED
+  test_zero_room_width ........................... PASSED
+  test_negative_room_length ...................... PASSED
+  test_zero_furniture_width ...................... PASSED
+  test_negative_furniture_length ................. PASSED
+  test_non_numeric_width ......................... PASSED
+  test_infinity_width ............................ PASSED
+  test_non_finite_width_string ................... PASSED
+  test_invalid_unit .............................. PASSED
+  test_valid_unit_explicit ....................... PASSED
+  test_furniture_missing_name .................... PASSED
+  test_furniture_whitespace_name ................. PASSED
+  test_furniture_missing_id ...................... PASSED
+  test_duplicate_furniture_id .................... PASSED
+  test_exceeds_max_dimension ..................... PASSED
+  test_exceeds_max_furniture_count ............... PASSED
+  test_layout_api_rotation_applied ............... PASSED
+  test_layout_api_multiple_items_no_overlap ...... PASSED
+  test_health_endpoint ........................... PASSED
+```
+
+#### Frontend — TypeScript & Build
+```
+npx tsc --noEmit → 0 errors
+npx vite build → ✅ success (244ms)
+```
+
+---
+
+### 🐇 CodeRabbit Review & Remediation
+
+| Issue | Severity | Status | Fix Applied |
+|---|---|---|---|
+| `backend/schemas.py`: Cap `furniture` list length to bound $O(n^3)$ placement cost | Minor | ✅ Fixed | Added `max_length=100` to `RoomInput.furniture` and added `test_exceeds_max_furniture_count` |
+| Final Re-review (`--fresh`) | — | ✅ 0 Findings | All 8 files passed cleanly |
+
+---
+
+### 🤖 Agent / Model Usage This Session
+
+| Provider | Purpose | Calls | Notes |
+|----------|---------|-------|-------|
+| OmniRoute / IDE (Gemini 3.8 Flash) | Day 3 layout planning & implementation | Active session | Coding agent |
+| CodeRabbit CLI | Code quality & security audit | 2 runs | 1 finding addressed; verified clean (0 findings) |
+| Baseten (Muse Spark Open) | — | 0 | No Meta API calls (strict credit conservation) |
 
 ---
 
@@ -65,123 +152,23 @@ cd "d:\PROJECTS\ROOMGENIUS AI\frontend"
 npm run dev
 ```
 
-#### Quick health check (after both servers are running)
-```powershell
-Invoke-RestMethod http://localhost:8000/health
-# Expected: status = healthy
-```
-
-#### Run backend tests
+#### Run All Tests
 ```powershell
 cd "d:\PROJECTS\ROOMGENIUS AI\backend"
 .venv\Scripts\Activate.ps1
-python -m pytest test_layout.py -v
+python -m pytest -v
 ```
 
 ---
 
-### 🌐 API Endpoints
+### 📌 Current Git Branch & Commit
 
-| Method | Path | Response |
-|--------|------|----------|
-| GET | `http://localhost:8000/health` | `{ "status": "healthy" }` |
-| POST | `http://localhost:8000/layout` | `{ "status": "accepted", "summary": {...} }` on valid; 422 on invalid |
-| GET | `http://localhost:8000/docs` | Swagger UI (auto-generated) |
+- **Branch:** `day3-layout-engine`
+- **Base Commit:** `72b4861` (Day 2 complete)
+- **Status:** Day 3 implementation, tests, and CodeRabbit review 100% complete; ready for commit and push.
 
 ---
 
-### 📋 Pydantic Schema Summary (`backend/schemas.py`)
+### ⏭️ Exact Next Task to Resume (Day 4)
 
-All dimensions in **centimetres (cm)**.
-
-```
-RoomInput
-  width       float  (0 < x ≤ 2000 cm)  — room X-axis
-  length      float  (0 < x ≤ 2000 cm)  — room Y-axis (depth)
-  height      float | None  (0 < x ≤ 500 cm, optional)
-  unit        str  (default "cm")
-  furniture   list[FurnitureItem] (can be empty)
-  preferences dict | None
-
-FurnitureItem
-  id      str   (min 1 char, unique identifier)
-  name    str   (min 1 char)
-  width   float (0 < x ≤ 2000 cm)
-  length  float (0 < x ≤ 2000 cm)
-  height  float | None (0 < x ≤ 500 cm, optional)
-```
-
----
-
-### 🧪 Test Results (Day 2)
-
-#### Backend — pytest (17/17 passed)
-```
-test_valid_room_with_furniture ............... PASSED
-test_valid_room_empty_furniture .............. PASSED
-test_valid_room_with_height .................. PASSED
-test_missing_width ........................... PASSED
-test_missing_length .......................... PASSED
-test_missing_both_dimensions ................. PASSED
-test_zero_room_width ......................... PASSED
-test_negative_room_length .................... PASSED
-test_zero_furniture_width .................... PASSED
-test_negative_furniture_length ............... PASSED
-test_non_numeric_width ....................... PASSED
-test_infinity_width .......................... PASSED
-test_non_finite_width_string ................. PASSED
-test_invalid_unit ............................ PASSED
-test_valid_unit_explicit ..................... PASSED
-test_furniture_missing_name .................. PASSED
-test_furniture_whitespace_name ............... PASSED
-test_furniture_missing_id .................... PASSED
-test_duplicate_furniture_id .................. PASSED
-test_exceeds_max_dimension ................... PASSED
-test_health_endpoint ......................... PASSED
-```
-
-#### Frontend — TypeScript
-```
-npx tsc --noEmit → 0 errors
-npx vite build → ✅ success
-```
-
----
-
-### 🐇 CodeRabbit Review & Remediation
-
-| Issue | Severity | Status | Fix Applied |
-|---|---|---|---|
-| `backend/schemas.py`: Restrict `unit` | Minor | ✅ Fixed | Changed `unit: str` to `Literal["cm"]` |
-| `frontend/src/App.tsx`: Safe response JSON parsing | Minor | ✅ Fixed | Handled empty / non-JSON responses with `.catch(() => null)` |
-| `frontend/src/App.tsx`: 500 cm height validation | Minor | ✅ Fixed | Updated `validateDimension` to enforce 500 cm limit for optional height fields |
-| `backend/schemas.py`: Reject whitespace-only names | Minor | ✅ Fixed | Added validator to strip whitespace and reject blank names |
-| `backend/schemas.py`: Enforce unique furniture IDs | Minor | ✅ Fixed | Added `validate_unique_furniture_ids` validator in `RoomInput` |
-
----
-
-### 🤖 Agent / Model Usage This Session
-
-| Provider | Purpose | Calls | Notes |
-|----------|---------|-------|-------|
-| OmniRoute / IDE (Gemini 3.8 Flash / Claude Opus 4.6) | Code scaffolding & editing | Active session | Default coding agent |
-| CodeRabbit CLI | Code quality & security audit | 2 runs | Findings addressed and re-verified |
-| Baseten (Muse Spark Open) | — | 0 | No Meta API calls made today (credit conservation) |
-
----
-
-### 📌 Current Branch & Commit
-
-- **Branch:** `day2-room-input`
-- **Commits:**
-  - `51205e1` feat: Day 2 — room input form, POST /layout endpoint, 17 validation tests
-- **Status:** Day 2 implementation & CodeRabbit audit complete, verified with 21 unit tests.
-
----
-
-### ⏭️ Day 3 Focus / Upcoming Tasks
-
-1. **Deterministic geometry engine** (`backend/geometry.py`) — AABB bounding boxes, clearance pathways (75–90 cm).
-2. **Furniture placement logic** — collision detection, egress path validation.
-3. **AI Layout Suggestion Pipeline** (`backend/ai.py`) — integrate Baseten Muse Spark calls with reasoning caps and prompt engineering.
-4. **2D room visualization** — Canvas/SVG rendering of the room layout in the frontend.
+> **Task:** 2D interactive room layout visualization. Render the generated room boundary, doors/windows, and placed furniture items in an interactive HTML5 Canvas or SVG component in `frontend/src/` with clear dimension labels, orientation indicators, and visual clearance corridors.

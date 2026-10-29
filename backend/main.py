@@ -7,12 +7,13 @@ RoomGenius AI — FastAPI application entry point.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas import RoomInput
+from geometry import generate_layout
+from schemas import LayoutResponse, RoomInput
 
 app = FastAPI(
     title="RoomGenius AI",
     description="AI-powered room layout assistant — backend API",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 # Allow Vite dev server (port 5173) to call the API during development.
@@ -31,24 +32,34 @@ def health_check():
     return {"status": "healthy"}
 
 
-@app.post("/layout", tags=["room"])
+@app.post("/layout", response_model=LayoutResponse, tags=["room"])
 def submit_layout(room: RoomInput):
     """
-    Accept and validate a room layout submission.
+    Accept, validate, and compute a deterministic furniture layout.
 
-    Pydantic validates all fields automatically — invalid payloads
-    get a 422 with detailed error messages.
-
-    Returns a summary of the accepted data (no placement logic yet).
+    Uses deterministic AABB candidate-anchor placement and collision checking.
+    Returns placement coordinates (x, y), effective dimensions, orientation (0° or 90°),
+    and per-item rejection details if unplaceable.
     """
+    plan = generate_layout(
+        room_width=room.width,
+        room_length=room.length,
+        furniture_items=room.furniture,
+    )
+
     return {
         "status": "accepted",
+        "feasible": plan.feasible,
         "summary": {
             "room_width_cm": room.width,
             "room_length_cm": room.length,
             "room_height_cm": room.height,
             "unit": room.unit,
-            "furniture_count": len(room.furniture),
+            "furniture_count": plan.total_furniture,
+            "placed_count": plan.placed_count,
+            "unplaced_count": plan.unplaced_count,
             "has_preferences": room.preferences is not None,
         },
+        "placed_items": [item.__dict__ for item in plan.placed_items],
+        "unplaced_items": [item.__dict__ for item in plan.unplaced_items],
     }

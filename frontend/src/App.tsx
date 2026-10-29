@@ -11,6 +11,37 @@ interface FurnitureItem {
   height: string
 }
 
+interface PlacedItem {
+  id: string
+  name: string
+  placed: boolean
+  x?: number
+  y?: number
+  width?: number
+  length?: number
+  height?: number
+  rotation: number
+  within_bounds: boolean
+  rejection_reason?: string
+}
+
+interface LayoutResponseData {
+  status: string
+  feasible: boolean
+  summary: {
+    room_width_cm: number
+    room_length_cm: number
+    room_height_cm?: number
+    unit: string
+    furniture_count: number
+    placed_count: number
+    unplaced_count: number
+    has_preferences: boolean
+  }
+  placed_items: PlacedItem[]
+  unplaced_items: PlacedItem[]
+}
+
 type HealthStatus = 'idle' | 'checking' | 'healthy' | 'error'
 type SubmitStatus = 'idle' | 'submitting' | 'accepted' | 'error'
 
@@ -59,6 +90,7 @@ export default function App() {
   // Submission
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle')
   const [submitMessage, setSubmitMessage] = useState('')
+  const [layoutResult, setLayoutResult] = useState<LayoutResponseData | null>(null)
 
   /* ── Health check ──────────────────────────────────────────────── */
 
@@ -143,6 +175,7 @@ export default function App() {
 
     setSubmitStatus('submitting')
     setSubmitMessage('')
+    setLayoutResult(null)
     try {
       const res = await fetch('/api/layout', {
         method: 'POST',
@@ -158,10 +191,16 @@ export default function App() {
             : (typeof data?.detail === 'string' && data.detail) || `HTTP ${res.status}`
         throw new Error(detail)
       }
+      setLayoutResult(data)
       setSubmitStatus('accepted')
-      setSubmitMessage(
-        `Room accepted! ${data?.summary?.furniture_count ?? 0} furniture item(s) validated.`,
-      )
+      const placedCnt = data?.summary?.placed_count ?? 0
+      const totalCnt = data?.summary?.furniture_count ?? 0
+      const unplacedCnt = data?.summary?.unplaced_count ?? 0
+      if (unplacedCnt > 0) {
+        setSubmitMessage(`Partial layout generated: ${placedCnt}/${totalCnt} items placed. ${unplacedCnt} item(s) could not fit.`)
+      } else {
+        setSubmitMessage(`Feasible layout generated! All ${placedCnt} furniture item(s) placed without overlap.`)
+      }
     } catch (err) {
       setSubmitStatus('error')
       setSubmitMessage(err instanceof Error ? err.message : 'Submission failed')
@@ -367,6 +406,79 @@ export default function App() {
           <p className="rg-toast rg-toast--error">{submitMessage}</p>
         )}
       </form>
+
+      {/* Deterministic Layout Results (Day 3) */}
+      {layoutResult && (
+        <section className="rg-card rg-results-card">
+          <div className="rg-results-header">
+            <h2>Generated Layout Arrangement</h2>
+            <span
+              className={`rg-badge ${
+                layoutResult.feasible ? 'rg-badge--success' : 'rg-badge--warning'
+              }`}
+            >
+              {layoutResult.feasible ? 'Feasible Layout' : 'Partial Layout'}
+            </span>
+          </div>
+
+          <p className="rg-results-summary">
+            Placed <strong>{layoutResult.summary.placed_count}</strong> of{' '}
+            <strong>{layoutResult.summary.furniture_count}</strong> item(s) in a{' '}
+            {layoutResult.summary.room_width_cm} × {layoutResult.summary.room_length_cm} cm room.
+          </p>
+
+          {/* Placed Items Table */}
+          {layoutResult.placed_items.length > 0 && (
+            <div className="rg-items-table-wrapper">
+              <table className="rg-items-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Position (X, Y)</th>
+                    <th>Placed Size (W × D)</th>
+                    <th>Rotation</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {layoutResult.placed_items.map(item => (
+                    <tr key={item.id}>
+                      <td>
+                        <strong>{item.name}</strong> <span className="rg-item-id">({item.id})</span>
+                      </td>
+                      <td>
+                        ({item.x} cm, {item.y} cm)
+                      </td>
+                      <td>
+                        {item.width} × {item.length} cm
+                      </td>
+                      <td>{item.rotation}°</td>
+                      <td>
+                        <span className="rg-tag rg-tag--success">Valid</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Unplaced Items Section */}
+          {layoutResult.unplaced_items.length > 0 && (
+            <div className="rg-unplaced-section">
+              <h3 className="rg-unplaced-title">⚠️ Unplaced Furniture ({layoutResult.unplaced_items.length})</h3>
+              <ul className="rg-unplaced-list">
+                {layoutResult.unplaced_items.map(item => (
+                  <li key={item.id}>
+                    <strong>{item.name}</strong> ({item.width} × {item.length} cm):{' '}
+                    <span className="rg-rejection-reason">{item.rejection_reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
     </main>
   )
 }

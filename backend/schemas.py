@@ -45,7 +45,9 @@ class RoomInput(BaseModel):
     height: Optional[float] = Field(None, gt=0, le=500, description="Room ceiling height in cm (optional)")
     unit: Literal["cm"] = Field(default="cm", description="Measurement unit (strictly 'cm')")
     furniture: list[FurnitureItem] = Field(
-        default_factory=list, description="List of furniture items (can be empty)"
+        default_factory=list,
+        max_length=100,
+        description="List of furniture items (can be empty, max 100 items)",
     )
 
     @field_validator("furniture")
@@ -61,3 +63,27 @@ class RoomInput(BaseModel):
         default=None,
         description="Optional user preferences, e.g. {'style': 'minimalist', 'priority': 'bed'}"
     )
+
+
+class PlacedFurnitureItem(BaseModel):
+    """Details of a placed or evaluated furniture item."""
+    id: str
+    name: str
+    placed: bool
+    x: Optional[float] = None
+    y: Optional[float] = None
+    width: Optional[float] = None
+    length: Optional[float] = None
+    height: Optional[float] = None
+    rotation: int = 0
+    within_bounds: bool = False
+    rejection_reason: Optional[str] = None
+
+
+class LayoutResponse(BaseModel):
+    """API response contract for POST /layout."""
+    status: str = "accepted"
+    feasible: bool
+    summary: dict
+    placed_items: list[PlacedFurnitureItem] = Field(default_factory=list)
+    unplaced_items: list[PlacedFurnitureItem] = Field(default_factory=list)
