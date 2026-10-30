@@ -1,4 +1,4 @@
-/* ── RoomGenius AI — Day 2 styles ──────────────────────────────── */
+/* ── RoomGenius AI styles ───────────────────────────────────────── */
 
 *,
 *::before,
@@ -17,7 +17,7 @@ body {
 /* ── Layout ─────────────────────────────────────────────────────── */
 
 .rg-main {
-  max-width: 640px;
+  max-width: 960px;
   margin: 40px auto;
   padding: 0 20px 60px;
 }
@@ -209,7 +209,7 @@ body {
   color: #991b1b;
 }
 
-/* ── Layout Results ──────────────────────────────────────────────── */
+/* ── Layout & 2D Visualization Results (Day 4) ──────────────────── */
 
 .rg-results-card {
   border-top: 4px solid #3b82f6;
@@ -219,14 +219,21 @@ body {
 .rg-results-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 
 .rg-results-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+}
+
+.rg-results-subtitle {
   margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
 }
 
 .rg-badge {
@@ -248,47 +255,265 @@ body {
   color: #b45309;
 }
 
-.rg-results-summary {
-  color: #4b5563;
-  margin: 0 0 16px;
-  font-size: 0.95rem;
+/* ── Metrics Bar ─────────────────────────────────────────────────── */
+
+.rg-metrics-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+}
+
+.rg-metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.rg-metric-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rg-metric-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 2px 0;
+}
+
+.rg-metric-sub {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* ── Before / After Comparison Grid ──────────────────────────────── */
+
+.rg-comparison-container {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 20px;
+  margin-bottom: 28px;
+  align-items: start;
+}
+
+.rg-comparison-col {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.rg-col-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.rg-col-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1e293b;
+}
+
+.rg-col-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.rg-col-tag--before {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.rg-col-tag--after {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.rg-truthful-note {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+/* ── Inventory List (Before) ─────────────────────────────────────── */
+
+.rg-inventory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.rg-inventory-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.rg-inventory-card:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.rg-inventory-card--selected {
+  border-color: #3b82f6 !important;
+  background: #eff6ff !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.rg-inventory-card--unplaced {
+  border-left: 3px solid #f59e0b;
+}
+
+.rg-inventory-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.rg-inventory-top strong {
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+
+.rg-inventory-meta {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* ── Visualizer (After) ──────────────────────────────────────────── */
+
+.rg-visualizer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.rg-visualizer-svg {
+  width: 100%;
+  max-height: 460px;
+  display: block;
+  user-select: none;
+}
+
+.rg-visualizer-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.rg-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rg-legend-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #94a3b8;
+  border-radius: 2px;
+}
+
+.rg-legend-badge {
+  color: #3b82f6;
+  font-weight: bold;
+}
+
+/* ── Table Section ───────────────────────────────────────────────── */
+
+.rg-table-section {
+  margin-top: 20px;
+}
+
+.rg-table-section h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: #1e293b;
 }
 
 .rg-items-table-wrapper {
   overflow-x: auto;
   margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
 .rg-items-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   text-align: left;
 }
 
 .rg-items-table th,
 .rg-items-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .rg-items-table th {
-  background: #f9fafb;
-  color: #374151;
+  background: #f8fafc;
+  color: #475569;
   font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rg-items-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.rg-table-row--selected {
+  background: #eff6ff !important;
+}
+
+.rg-table-row--selected td:first-child {
+  border-left: 3px solid #3b82f6;
 }
 
 .rg-item-id {
-  color: #9ca3af;
-  font-size: 0.8rem;
-  font-weight: normal;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-family: monospace;
 }
 
 .rg-tag {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
@@ -296,6 +521,45 @@ body {
   background: #dcfce7;
   color: #166534;
 }
+
+.rg-tag--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rg-badge-rotation {
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.rg-btn-select {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.rg-btn-select:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.rg-btn-select--active {
+  background: #3b82f6;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.rg-btn-select--active:hover {
+  background: #2563eb;
+}
+
+/* ── Unplaced Items Section ──────────────────────────────────────── */
 
 .rg-unplaced-section {
   background: #fffbeb;
@@ -306,15 +570,21 @@ body {
 }
 
 .rg-unplaced-title {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   font-size: 0.95rem;
   color: #92400e;
+}
+
+.rg-unplaced-desc {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  color: #78350f;
 }
 
 .rg-unplaced-list {
   margin: 0;
   padding-left: 20px;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: #78350f;
 }
 
@@ -327,7 +597,21 @@ body {
   font-style: italic;
 }
 
+/* ── Results Actions ─────────────────────────────────────────────── */
+
+.rg-results-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .rg-comparison-container {
+    grid-template-columns: 1fr;
+  }
+}
 
 @media (max-width: 480px) {
   .rg-main {
@@ -349,5 +633,9 @@ body {
 
   .rg-field {
     flex: 1 1 auto;
+  }
+
+  .rg-metrics-bar {
+    grid-template-columns: 1fr 1fr;
   }
 }

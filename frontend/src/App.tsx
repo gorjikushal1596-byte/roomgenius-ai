@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { RoomVisualizer } from './RoomVisualizer'
 import './App.css'
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -82,7 +83,7 @@ export default function App() {
   const [roomHeight, setRoomHeight] = useState('')
 
   // Furniture
-  const [furniture, setFurniture] = useState<FurnitureItem[]>([emptyItem()])
+  const [furniture, setFurniture] = useState<FurnitureItem[]>(() => [emptyItem()])
 
   // Preferences
   const [style, setStyle] = useState('')
@@ -91,6 +92,9 @@ export default function App() {
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle')
   const [submitMessage, setSubmitMessage] = useState('')
   const [layoutResult, setLayoutResult] = useState<LayoutResponseData | null>(null)
+  const [submittedInventory, setSubmittedInventory] = useState<FurnitureItem[]>([])
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null)
 
   /* ── Health check ──────────────────────────────────────────────── */
 
@@ -176,6 +180,7 @@ export default function App() {
     setSubmitStatus('submitting')
     setSubmitMessage('')
     setLayoutResult(null)
+    setSelectedItemId(null)
     try {
       const res = await fetch('/api/layout', {
         method: 'POST',
@@ -192,6 +197,7 @@ export default function App() {
         throw new Error(detail)
       }
       setLayoutResult(data)
+      setSubmittedInventory([...furniture])
       setSubmitStatus('accepted')
       const placedCnt = data?.summary?.placed_count ?? 0
       const totalCnt = data?.summary?.furniture_count ?? 0
@@ -228,7 +234,7 @@ export default function App() {
   return (
     <main className="rg-main">
       <h1 className="rg-title">🏠 RoomGenius AI</h1>
-      <p className="rg-subtitle">AI-powered room layout assistant — Day 2</p>
+      <p className="rg-subtitle">AI-powered room layout assistant</p>
 
       {/* Health check */}
       <section className="rg-card">
@@ -407,78 +413,239 @@ export default function App() {
         )}
       </form>
 
-      {/* Deterministic Layout Results (Day 3) */}
-      {layoutResult && (
-        <section className="rg-card rg-results-card">
-          <div className="rg-results-header">
-            <h2>Generated Layout Arrangement</h2>
-            <span
-              className={`rg-badge ${
-                layoutResult.feasible ? 'rg-badge--success' : 'rg-badge--warning'
-              }`}
-            >
-              {layoutResult.feasible ? 'Feasible Layout' : 'Partial Layout'}
-            </span>
-          </div>
+      {/* Deterministic Layout & 2D Visualization Results (Day 4) */}
+      {layoutResult && (() => {
+        const roomAreaM2 = (layoutResult.summary.room_width_cm * layoutResult.summary.room_length_cm) / 10000
+        const furnitureAreaM2 = layoutResult.placed_items.reduce((sum, item) => sum + (item.width || 0) * (item.length || 0), 0) / 10000
+        const utilizationPercent = roomAreaM2 > 0 ? ((furnitureAreaM2 / roomAreaM2) * 100).toFixed(1) : '0'
 
-          <p className="rg-results-summary">
-            Placed <strong>{layoutResult.summary.placed_count}</strong> of{' '}
-            <strong>{layoutResult.summary.furniture_count}</strong> item(s) in a{' '}
-            {layoutResult.summary.room_width_cm} × {layoutResult.summary.room_length_cm} cm room.
-          </p>
+        return (
+          <section className="rg-card rg-results-card" id="layout-results-section">
+            <div className="rg-results-header">
+              <div>
+                <h2>Room Layout & 2D Visualization</h2>
+                <p className="rg-results-subtitle">
+                  Deterministic floorplan generated from validated boundary and collision rules.
+                </p>
+              </div>
+              <span
+                className={`rg-badge ${
+                  layoutResult.feasible ? 'rg-badge--success' : 'rg-badge--warning'
+                }`}
+              >
+                {layoutResult.feasible ? '✓ Feasible Layout' : '⚠️ Partial Layout'}
+              </span>
+            </div>
 
-          {/* Placed Items Table */}
-          {layoutResult.placed_items.length > 0 && (
-            <div className="rg-items-table-wrapper">
-              <table className="rg-items-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Position (X, Y)</th>
-                    <th>Placed Size (W × D)</th>
-                    <th>Rotation</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {layoutResult.placed_items.map(item => (
-                    <tr key={item.id}>
-                      <td>
-                        <strong>{item.name}</strong> <span className="rg-item-id">({item.id})</span>
-                      </td>
-                      <td>
-                        ({item.x} cm, {item.y} cm)
-                      </td>
-                      <td>
-                        {item.width} × {item.length} cm
-                      </td>
-                      <td>{item.rotation}°</td>
-                      <td>
-                        <span className="rg-tag rg-tag--success">Valid</span>
-                      </td>
-                    </tr>
+            {/* Metrics Bar */}
+            <div className="rg-metrics-bar">
+              <div className="rg-metric">
+                <span className="rg-metric-label">Room Area</span>
+                <span className="rg-metric-value">{roomAreaM2.toFixed(1)} m²</span>
+                <span className="rg-metric-sub">{layoutResult.summary.room_width_cm} × {layoutResult.summary.room_length_cm} cm</span>
+              </div>
+              <div className="rg-metric">
+                <span className="rg-metric-label">Furniture Footprint</span>
+                <span className="rg-metric-value">{furnitureAreaM2.toFixed(1)} m²</span>
+                <span className="rg-metric-sub">{layoutResult.summary.placed_count} item(s) placed</span>
+              </div>
+              <div className="rg-metric">
+                <span className="rg-metric-label">Floor Utilization</span>
+                <span className="rg-metric-value">{utilizationPercent}%</span>
+                <span className="rg-metric-sub">{(roomAreaM2 - furnitureAreaM2).toFixed(1)} m² free space</span>
+              </div>
+              <div className="rg-metric">
+                <span className="rg-metric-label">Placement Rate</span>
+                <span className="rg-metric-value">
+                  {layoutResult.summary.placed_count} / {layoutResult.summary.furniture_count}
+                </span>
+                <span className="rg-metric-sub">
+                  {layoutResult.summary.unplaced_count === 0 ? 'All placed' : `${layoutResult.summary.unplaced_count} unplaced`}
+                </span>
+              </div>
+            </div>
+
+            {/* Before / After Comparison Grid */}
+            <div className="rg-comparison-container">
+              <div className="rg-comparison-col">
+                <div className="rg-col-header">
+                  <span className="rg-col-tag rg-col-tag--before">Before</span>
+                  <h3>Unarranged Inventory</h3>
+                </div>
+                <p className="rg-truthful-note">
+                  Initial spatial positions were not supplied. Showing inventory awaiting layout optimization:
+                </p>
+                <div className="rg-inventory-list">
+                  {submittedInventory.length === 0 && (
+                    <p className="rg-empty">No furniture items were submitted for this room.</p>
+                  )}
+                  {submittedInventory.map((item, idx) => {
+                    const isPlaced = layoutResult.placed_items.some(p => p.id === item.id)
+                    const isSelected = selectedItemId === item.id
+                    const isHovered = hoveredItemId === item.id
+                    const isActive = isSelected || isHovered
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`rg-inventory-card ${isActive ? 'rg-inventory-card--selected' : ''} ${
+                          !isPlaced ? 'rg-inventory-card--unplaced' : ''
+                        }`}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedItemId(isSelected ? null : item.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setSelectedItemId(isSelected ? null : item.id)
+                          }
+                        }}
+                        onFocus={() => setHoveredItemId(item.id)}
+                        onBlur={() => setHoveredItemId(null)}
+                        onMouseEnter={() => setHoveredItemId(item.id)}
+                        onMouseLeave={() => setHoveredItemId(null)}
+                      >
+                        <div className="rg-inventory-top">
+                          <strong>#{idx + 1} {item.name || '(Unnamed)'}</strong>
+                          <span className={`rg-tag ${isPlaced ? 'rg-tag--success' : 'rg-tag--warning'}`}>
+                            {isPlaced ? 'Placed' : 'Rejected'}
+                          </span>
+                        </div>
+                        <div className="rg-inventory-meta">
+                          <span>{item.width || '0'} × {item.length || '0'} cm</span>
+                          {item.height && <span> · H: {item.height} cm</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="rg-comparison-col">
+                <div className="rg-col-header">
+                  <span className="rg-col-tag rg-col-tag--after">After</span>
+                  <h3>Proposed 2D Floorplan</h3>
+                </div>
+                <p className="rg-truthful-note">
+                  Interactive vector floorplan rendered using coordinates from deterministic engine:
+                </p>
+                <RoomVisualizer
+                  roomWidth={layoutResult.summary.room_width_cm}
+                  roomLength={layoutResult.summary.room_length_cm}
+                  items={layoutResult.placed_items}
+                  selectedId={selectedItemId}
+                  hoveredId={hoveredItemId}
+                  onSelectItem={setSelectedItemId}
+                  onHoverItem={setHoveredItemId}
+                />
+              </div>
+            </div>
+
+            {/* Placed Items Table */}
+            {layoutResult.placed_items.length > 0 && (
+              <div className="rg-table-section">
+                <h3>Placed Furniture Breakdown</h3>
+                <div className="rg-items-table-wrapper">
+                  <table className="rg-items-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Position (X, Y)</th>
+                        <th>Placed Footprint (W × D)</th>
+                        <th>Orientation</th>
+                        <th>Bounds Check</th>
+                        <th>Select</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {layoutResult.placed_items.map(item => {
+                        const isSelected = selectedItemId === item.id
+                        const isHovered = hoveredItemId === item.id
+                        const isActive = isSelected || isHovered
+
+                        return (
+                          <tr
+                            key={item.id}
+                            className={isActive ? 'rg-table-row--selected' : ''}
+                            onClick={() => setSelectedItemId(isSelected ? null : item.id)}
+                            onMouseEnter={() => setHoveredItemId(item.id)}
+                            onMouseLeave={() => setHoveredItemId(null)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <td>
+                              <strong>{item.name}</strong> <span className="rg-item-id">({item.id})</span>
+                            </td>
+                            <td>
+                              ({item.x} cm, {item.y} cm)
+                            </td>
+                            <td>
+                              {item.width} × {item.length} cm
+                            </td>
+                            <td>
+                              <span className="rg-badge-rotation">
+                                {item.rotation === 90 ? '↻ 90° (Rotated)' : '0° (Standard)'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="rg-tag rg-tag--success">Inside room</span>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className={`rg-btn-select ${isSelected ? 'rg-btn-select--active' : ''}`}
+                                aria-pressed={isSelected}
+                                aria-label={`Select ${item.name}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedItemId(isSelected ? null : item.id)
+                                }}
+                                onFocus={() => setHoveredItemId(item.id)}
+                                onBlur={() => setHoveredItemId(null)}
+                              >
+                                {isSelected ? '✓ Selected' : 'Select'}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Unplaced Items Section */}
+            {layoutResult.unplaced_items.length > 0 && (
+              <div className="rg-unplaced-section">
+                <h3 className="rg-unplaced-title">⚠️ Infeasible Furniture Items ({layoutResult.unplaced_items.length})</h3>
+                <p className="rg-unplaced-desc">
+                  The following items could not be placed due to boundary constraints or positive-area collisions:
+                </p>
+                <ul className="rg-unplaced-list">
+                  {layoutResult.unplaced_items.map(item => (
+                    <li key={item.id}>
+                      <strong>{item.name}</strong> ({item.width} × {item.length} cm):{' '}
+                      <span className="rg-rejection-reason">{item.rejection_reason}</span>
+                    </li>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                </ul>
+              </div>
+            )}
 
-          {/* Unplaced Items Section */}
-          {layoutResult.unplaced_items.length > 0 && (
-            <div className="rg-unplaced-section">
-              <h3 className="rg-unplaced-title">⚠️ Unplaced Furniture ({layoutResult.unplaced_items.length})</h3>
-              <ul className="rg-unplaced-list">
-                {layoutResult.unplaced_items.map(item => (
-                  <li key={item.id}>
-                    <strong>{item.name}</strong> ({item.width} × {item.length} cm):{' '}
-                    <span className="rg-rejection-reason">{item.rejection_reason}</span>
-                  </li>
-                ))}
-              </ul>
+            {/* Action Bar */}
+            <div className="rg-results-actions">
+              <button
+                type="button"
+                className="rg-btn rg-btn--secondary"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              >
+                ↑ Modify Room Inputs
+              </button>
             </div>
-          )}
-        </section>
-      )}
+          </section>
+        )
+      })()}
     </main>
   )
 }
