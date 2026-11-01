@@ -792,6 +792,69 @@ flowchart TD
 | **Build & Quality Check** | Frontend build | ✅ Complete | `oxlint` **0 warnings, 0 errors**; `tsc -b` and `vite build` completed in **151ms** (`257.65 kB`). |
 | **Full Regression Suite** | `pytest backend` | ✅ Complete | **108 / 108 tests passing** in 5.41s. Deterministic geometry engine remains the locked ground truth. |
 
+---
+
+## Day 8 — Final Demo & Submission Readiness (November 1, 2026 IST)
+
+---
+
+### 🔎 Verified Starting State (Day 8 Audit)
+
+| Item | Status | Verified Evidence |
+| :--- | :---: | :--- |
+| **Git Branch** | `day8-demo-readiness` (branched from `day7-final-polish`) | Clean start, commit `217ecb2` |
+| **Backend Test Suite** | ✅ 100% Passing | **108 / 108 pytest tests passed** in 5.30s (0 external API calls) |
+| **Frontend Production Build** | ✅ 100% Passing | `oxlint` 0 warnings, `tsc -b` 0 errors, `vite build` 165ms (`257.65 kB`) |
+| **End-to-End User Journey** | ✅ 100% Passing | All 10 user journey steps verified via `verify_demo_journey.py` |
+| **Deterministic Geometry Lock** | ✅ Locked Ground Truth | `backend/geometry.py` untouched; AABB collision & boundaries strictly verified |
+
+---
+
+### 🤖 Actual Multi-Model Status Classification
+
+| Model / Service | Architectural Role | Actual Status | Verification Details |
+| :--- | :--- | :---: | :--- |
+| **Meta Muse Spark** (`muse-spark-1.3`) | Architectural layout critique & transit tips | **Implemented and tested** | Live Meta Model API tested (`status: success`) + deterministic offline fallback tested. 14 unit tests pass. |
+| **Meta SAM 3.1** (`sam-3.1`) | Furniture object segmentation & 2D boxes | **Implemented and tested** | Service, gateway endpoint (`POST /ai/segment-furniture`), and frontend photo scanner + calibration drawer. 10 unit tests pass. |
+| **Depth Anything V2** (`vits` Metric Indoor) | $Z$-axis depth layering & colormap heatmap | **Implemented and tested** | Perspective projection, metric scaling, SHA-256 cache, gateway endpoint, and frontend Depth Heatmap view toggle. 8 unit tests pass. |
+| **Meta Muse Image** (`muse-image-1.0`) | Photorealistic interior redesign previews | **Implemented and tested** | Service, gateway endpoint (`POST /ai/generate-preview`), frontend concept card, prompt inspector, and fallback tested. 7 unit tests pass. |
+
+---
+
+### 🎬 3-Minute Video Demo Sequence
+
+| Timestamp | Segment | On-Screen Action | Spoken Narration (Speaker Script) | On-Screen Caption |
+| :--- | :--- | :--- | :--- | :--- |
+| **0:00–0:20** | **Problem & Hook** | Slide / Camera on speaker, transition to RoomGenius AI home screen. | *"Interior design is broken: generative AI hallucinates floating furniture and impossible dimensions, while CAD tools are intimidating. What if you could combine mathematical physical truth with multimodal Meta AI reasoning? Meet RoomGenius AI."* | RoomGenius AI: Deterministic Geometry meets Meta AI |
+| **0:20–0:45** | **The Key Idea** | Pan over architecture diagram highlighting the Dual-Engine. | *"RoomGenius AI introduces the Dual-Engine architecture. The deterministic Python engine calculates collision boundaries, egress clearances, and metric positions. Meta AI explains the design reasoning, segments your furniture, and renders visual concepts."* | Dual-Engine Synergy: Math for Physics, AI for Reasoning |
+| **0:45–1:15** | **Live Ingestion & SAM Scanner** | Click **Scan Room Photo**, upload bedroom photo, switch view from **📷 Photo** to **🗺️ Depth Heatmap**. | *"You can start by clicking our Quick Presets or uploading a room photo. Meta SAM 3.1 detects furniture boundaries, while Depth Anything V2 estimates Z-axis depth layers. Following our Golden Rule, optical depth never replaces human measurements: users calibrate dimensions in the staging drawer."* | Meta SAM 3.1 + Depth Anything V2: Optical Perception |
+| **1:15–1:45** | **Deterministic Layout** | Click **Generate Optimized Layout** (Master Bedroom). Side-by-side Before/After renders. | *"With one click, our deterministic engine computes candidate anchors and AABB collisions. Look at the After view: every single item is placed with exact centimetre coordinates, zero overlaps, and guaranteed clearances."* | Deterministic Geometry: Physical Feasibility Guaranteed |
+| **1:45–2:15** | **Infeasible Collision Test** | Click **⚡ Quick Demo Presets -> Crowded Studio**, click Generate. Red error banner shows. | *"Let's test the limits: a crowded studio with oversized furniture. Rather than hallucinating success, the deterministic engine strictly flags the layout as infeasible and reports exactly why the sofa and wardrobe could not fit."* | Truthful Integrity: Never claims an invalid layout fits |
+| **2:15–2:40** | **Muse Spark & Muse Image** | Scroll to **Meta Muse Spark Critique**, then click **🎨 Generate Visual Concept**. | *"Down below, Meta Muse Spark provides an architectural critique grounded in the exact layout coordinates. And Meta Muse Image synthesizes an aesthetic redesign preview with clear truthfulness disclosures."* | Meta Muse Spark + Muse Image: Grounded Multi-Modal AI |
+| **2:40–3:00** | **Impact & Closing** | Switch to closing slide with GitHub QR code and tech stack. | *"RoomGenius AI bridges the gap between spatial computing, physical reality, and generative AI. Built for the Meta Global AI Developer Hackathon. Thank you!"* | Built with Meta Model API & Antigravity |
+
+---
+
+### 📋 Final Submission Checklist
+
+- [x] **Project Title**: RoomGenius AI — Deterministic Spatial Interior Design with Multimodal Meta AI
+- [x] **Tagline**: Physical layout feasibility guaranteed by deterministic geometry, enriched by Meta Muse Spark, SAM 3.1, Depth Anything V2, and Muse Image.
+- [x] **Repository URL**: `https://github.com/gorjikushal1596-byte/roomgenius-ai`
+- [x] **Core Stack**: FastAPI (Python), React 19 + TypeScript + Vite, Meta Model API (`muse-spark-1.3`, `sam-3.1`, `muse-image-1.0`), Depth Anything V2 (`vits`).
+- [x] **Automated Tests**: 108 / 108 passing backend tests (0 external API credits consumed).
+- [x] **Documentation**: Complete 15-section root `README.md` and sanitized `.env.example`.
+- [x] **Security Audit**: Zero committed credentials (`.env` in `.gitignore`), CORS restricted, concurrency semaphores active.
+- [x] **Deterministic Integrity**: Bounding box collisions and boundary checks remain 100% mathematically verified.
+
+---
+
+### ⏭️ Day 9 Final Priorities (Submission Window)
+
+1. **Record & Export Video**: Record screen + voiceover following the exact 3-minute script (MP4, 1080p, <=3m00s).
+2. **Upload Presentation / Pitch**: Publish video to YouTube / Loom and link in submission form.
+3. **Submit Devpost / Meta Portal**: Final submission checklist verification before deadline.
+
+
 
 
 
