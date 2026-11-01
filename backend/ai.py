@@ -241,14 +241,23 @@ def generate_layout_explanation(
 
             # Attempt to parse structured JSON from the model response
             parsed = _parse_model_json(raw_content)
-            if parsed:
+            summary_val = parsed.get("summary") if parsed else None
+            reasoning_val = parsed.get("design_reasoning") if parsed else None
+
+            if (
+                parsed
+                and isinstance(summary_val, str)
+                and summary_val.strip()
+                and isinstance(reasoning_val, str)
+                and reasoning_val.strip()
+            ):
                 try:
                     return LayoutExplanationResponse(
                         status="success",
-                        summary=parsed.get("summary") or "Personalized room arrangement generated.",
-                        design_reasoning=parsed.get("design_reasoning") or raw_content,
-                        arrangement_tips=parsed.get("arrangement_tips", []),
-                        trade_offs=parsed.get("trade_offs", []),
+                        summary=summary_val.strip(),
+                        design_reasoning=reasoning_val.strip(),
+                        arrangement_tips=parsed.get("arrangement_tips", []) if isinstance(parsed.get("arrangement_tips"), list) else [],
+                        trade_offs=parsed.get("trade_offs", []) if isinstance(parsed.get("trade_offs"), list) else [],
                         model_used=config["model"],
                         reasoning_content=reasoning_content or None,
                     )

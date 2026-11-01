@@ -59,6 +59,65 @@ type AiStatus = 'idle' | 'loading' | 'success' | 'error'
 
 const STYLE_OPTIONS = ['minimalist', 'modern', 'traditional', 'cozy', 'industrial'] as const
 
+interface PresetData {
+  name: string
+  description: string
+  icon: string
+  width: string
+  length: string
+  height: string
+  style: string
+  furniture: Array<{ name: string; width: string; length: string; height?: string }>
+}
+
+const DEMO_PRESETS: Record<string, PresetData> = {
+  'master-bedroom': {
+    name: 'Master Bedroom',
+    description: '450 × 550 cm · 4 items · Minimalist · 100% Feasible',
+    icon: '🛏️',
+    width: '450',
+    length: '550',
+    height: '270',
+    style: 'minimalist',
+    furniture: [
+      { name: 'Queen Platform Bed', width: '160', length: '200', height: '100' },
+      { name: 'Double Wardrobe', width: '120', length: '60', height: '210' },
+      { name: 'Writing Desk', width: '120', length: '60', height: '75' },
+      { name: 'Bedside Nightstand', width: '50', length: '45', height: '55' },
+    ],
+  },
+  'home-office': {
+    name: 'Compact Home Office',
+    description: '320 × 380 cm · 4 items · Modern · 100% Feasible',
+    icon: '💻',
+    width: '320',
+    length: '380',
+    height: '260',
+    style: 'modern',
+    furniture: [
+      { name: 'Executive Workstation', width: '140', length: '70', height: '75' },
+      { name: 'Ergonomic Office Chair', width: '65', length: '65', height: '110' },
+      { name: 'Tall Bookcase', width: '90', length: '35', height: '190' },
+      { name: 'Storage Credenza', width: '110', length: '45', height: '80' },
+    ],
+  },
+  'crowded-studio': {
+    name: 'Crowded Studio (Infeasible Test)',
+    description: '220 × 220 cm · 4 large items · Tests collision rejection',
+    icon: '⚠️',
+    width: '220',
+    length: '220',
+    height: '250',
+    style: 'cozy',
+    furniture: [
+      { name: 'King Bed', width: '190', length: '200', height: '110' },
+      { name: '3-Seater Sofa', width: '200', length: '90', height: '85' },
+      { name: '4-Person Dining Table', width: '120', length: '80', height: '75' },
+      { name: 'Wardrobe Unit', width: '140', length: '60', height: '200' },
+    ],
+  },
+}
+
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
 let idCounter = 0
@@ -129,6 +188,47 @@ export default function App() {
       setHealthStatus('error')
       setHealthError(err instanceof Error ? err.message : 'Unknown error')
     }
+  }
+
+  /* ── Presets & Reset (Day 7) ───────────────────────────────────── */
+
+  function loadPreset(key: string) {
+    const preset = DEMO_PRESETS[key]
+    if (!preset) return
+
+    setRoomWidth(preset.width)
+    setRoomLength(preset.length)
+    setRoomHeight(preset.height)
+    setStyle(preset.style)
+    setFurniture(
+      preset.furniture.map(f => ({
+        id: nextId(),
+        name: f.name,
+        width: f.width,
+        length: f.length,
+        height: f.height || '',
+      }))
+    )
+    setLayoutResult(null)
+    setSubmitStatus('idle')
+    setSubmitMessage('')
+    setAiExplanation(null)
+    setAiStatus('idle')
+    setAiError('')
+  }
+
+  function clearAll() {
+    setRoomWidth('')
+    setRoomLength('')
+    setRoomHeight('')
+    setStyle('')
+    setFurniture([emptyItem()])
+    setLayoutResult(null)
+    setSubmitStatus('idle')
+    setSubmitMessage('')
+    setAiExplanation(null)
+    setAiStatus('idle')
+    setAiError('')
   }
 
   /* ── Furniture CRUD ────────────────────────────────────────────── */
@@ -316,6 +416,42 @@ export default function App() {
         >
           {healthStatus === 'checking' ? 'Checking…' : 'Check Backend Health'}
         </button>
+      </section>
+
+      {/* Quick Demo Presets (Day 7) */}
+      <section className="rg-card rg-presets-card">
+        <div className="rg-presets-header">
+          <div>
+            <h2>⚡ Quick Demo Presets</h2>
+            <p className="rg-presets-subtitle">
+              Click a curated preset below to instantly load room dimensions and furniture:
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rg-btn rg-btn--secondary"
+            style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+            onClick={clearAll}
+          >
+            🧹 Reset Form
+          </button>
+        </div>
+        <div className="rg-presets-grid">
+          {Object.entries(DEMO_PRESETS).map(([key, preset]) => (
+            <button
+              key={key}
+              type="button"
+              className="rg-btn--preset"
+              onClick={() => loadPreset(key)}
+            >
+              <span className="rg-preset-icon">{preset.icon}</span>
+              <div>
+                <strong>{preset.name}</strong>
+                <small>{preset.description}</small>
+              </div>
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* Room input form */}

@@ -53,6 +53,71 @@ body {
   margin: -6px 0 16px;
 }
 
+/* ── Demo Presets ────────────────────────────────────────────────── */
+
+.rg-presets-card {
+  background: #fdfefe;
+  border-color: #e2e8f0;
+}
+
+.rg-presets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.rg-presets-subtitle {
+  color: #64748b;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.rg-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.rg-btn--preset {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rg-btn--preset:hover {
+  border-color: #6366f1;
+  background: #f8faff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.12);
+}
+
+.rg-preset-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.rg-btn--preset strong {
+  display: block;
+  font-size: 0.92rem;
+  color: #1e293b;
+}
+
+.rg-btn--preset small {
+  display: block;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
 /* ── Form rows & fields ─────────────────────────────────────────── */
 
 .rg-row {

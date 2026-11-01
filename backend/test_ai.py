@@ -306,4 +306,36 @@ def test_api_explain_handles_truncated_model_response(sample_explanation_request
             assert "truncated" in res.reasoning_content
 
 
+def test_api_explain_handles_missing_summary_or_reasoning(sample_explanation_request):
+    """Verify JSON missing summary or design_reasoning routes to labeled unparseable fallback."""
+    # Model returns valid JSON but missing summary and design_reasoning
+    fake_payload = json.dumps({
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "message": {
+                    "content": '{"arrangement_tips": ["Place bed against wall"]}',
+                    "reasoning_content": "Thinking...",
+                },
+            }
+        ]
+    }).encode("utf-8")
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = fake_payload
+
+        with patch("ai._get_env_config") as mock_cfg:
+            mock_cfg.return_value = {
+                "api_key": "dummy-key",
+                "base_url": "https://api.meta.ai/v1",
+                "model": "muse-spark-1.3",
+                "mock_mode": False,
+            }
+            res = generate_layout_explanation(sample_explanation_request)
+            assert res.status == "fallback"
+            assert res.model_used == "fallback-due-to-unparseable-response"
+            assert len(res.arrangement_tips) > 0
+
+
+
 
