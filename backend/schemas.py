@@ -87,3 +87,43 @@ class LayoutResponse(BaseModel):
     summary: dict
     placed_items: list[PlacedFurnitureItem] = Field(default_factory=list)
     unplaced_items: list[PlacedFurnitureItem] = Field(default_factory=list)
+
+
+class LayoutPreferences(BaseModel):
+    """Structured, bounded user design preferences."""
+    style: Optional[str] = Field(default=None, min_length=1, max_length=100, description="Aesthetic style name")
+    priority: Optional[str] = Field(default=None, min_length=1, max_length=100, description="Placement priority or item")
+    focus: Optional[str] = Field(default=None, min_length=1, max_length=100, description="Design focus area")
+    vibe: Optional[str] = Field(default=None, min_length=1, max_length=100, description="Atmospheric vibe")
+    lighting: Optional[str] = Field(default=None, min_length=1, max_length=100, description="Lighting preference")
+
+
+class LayoutExplanationRequest(BaseModel):
+    """Request payload to generate an AI explanation for an existing layout."""
+    room_width_cm: float = Field(..., gt=0, le=2000, description="Room width in cm")
+    room_length_cm: float = Field(..., gt=0, le=2000, description="Room length in cm")
+    room_height_cm: Optional[float] = Field(None, gt=0, le=500, description="Room height in cm")
+    preferences: Optional[LayoutPreferences] = Field(default=None, description="User design preferences")
+    placed_items: list[PlacedFurnitureItem] = Field(
+        default_factory=list,
+        max_length=100,
+        description="Items placed by deterministic engine (max 100)",
+    )
+    unplaced_items: list[PlacedFurnitureItem] = Field(
+        default_factory=list,
+        max_length=100,
+        description="Items rejected by deterministic engine (max 100)",
+    )
+
+
+
+class LayoutExplanationResponse(BaseModel):
+    """Structured AI explanation grounded in deterministic layout facts."""
+    status: Literal["success", "fallback"] = "success"
+    summary: str = Field(..., description="High-level architectural summary of the layout")
+    design_reasoning: str = Field(..., description="Why this arrangement optimizes aesthetics and functionality")
+    arrangement_tips: list[str] = Field(default_factory=list, description="Step-by-step physical placement guidance")
+    trade_offs: list[str] = Field(default_factory=list, description="Space trade-offs or clearance notices")
+    model_used: str = Field(default="mock-model", description="Model identifier used for generation")
+    reasoning_content: Optional[str] = Field(default=None, description="Model internal reasoning trace if available")
+

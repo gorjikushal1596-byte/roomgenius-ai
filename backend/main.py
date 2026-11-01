@@ -8,7 +8,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from geometry import generate_layout
-from schemas import LayoutResponse, RoomInput
+from ai import generate_layout_explanation, is_ai_configured
+from schemas import (
+    LayoutExplanationRequest,
+    LayoutExplanationResponse,
+    LayoutResponse,
+    RoomInput,
+)
 
 app = FastAPI(
     title="RoomGenius AI",
@@ -63,3 +69,22 @@ def submit_layout(room: RoomInput):
         "placed_items": [item.__dict__ for item in plan.placed_items],
         "unplaced_items": [item.__dict__ for item in plan.unplaced_items],
     }
+
+
+@app.get("/ai/status", tags=["ai"])
+def get_ai_status():
+    """Check whether Meta Model API is configured with credentials."""
+    return {"configured": is_ai_configured()}
+
+
+@app.post("/ai/explain", response_model=LayoutExplanationResponse, tags=["ai"])
+def explain_layout(request: LayoutExplanationRequest):
+    """
+    Generate an architectural explanation of a deterministic room layout.
+
+    Interprets natural language preferences and layout geometry using
+    Meta Muse Spark (or deterministic fallback when offline or in mock mode).
+    Strictly preserves deterministic coordinates.
+    """
+    return generate_layout_explanation(request)
+

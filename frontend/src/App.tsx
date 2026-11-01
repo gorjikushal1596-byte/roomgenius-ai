@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { RoomVisualizer } from './RoomVisualizer'
 import './App.css'
 
@@ -43,8 +43,19 @@ interface LayoutResponseData {
   unplaced_items: PlacedItem[]
 }
 
+interface LayoutExplanationData {
+  status: 'success' | 'fallback'
+  summary: string
+  design_reasoning: string
+  arrangement_tips: string[]
+  trade_offs: string[]
+  model_used: string
+  reasoning_content?: string
+}
+
 type HealthStatus = 'idle' | 'checking' | 'healthy' | 'error'
 type SubmitStatus = 'idle' | 'submitting' | 'accepted' | 'error'
+type AiStatus = 'idle' | 'loading' | 'success' | 'error'
 
 const STYLE_OPTIONS = ['minimalist', 'modern', 'traditional', 'cozy', 'industrial'] as const
 
@@ -93,8 +104,16 @@ export default function App() {
   const [submitMessage, setSubmitMessage] = useState('')
   const [layoutResult, setLayoutResult] = useState<LayoutResponseData | null>(null)
   const [submittedInventory, setSubmittedInventory] = useState<FurnitureItem[]>([])
+  const [submittedStyle, setSubmittedStyle] = useState<string>('')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null)
+
+  // AI Explanation (Day 5)
+  const [aiStatus, setAiStatus] = useState<AiStatus>('idle')
+  const [aiExplanation, setAiExplanation] = useState<LayoutExplanationData | null>(null)
+  const [aiError, setAiError] = useState<string>('')
+  const [showReasoningTrace, setShowReasoningTrace] = useState<boolean>(false)
+  const aiRequestRef = useRef<number>(0)
 
   /* ── Health check ──────────────────────────────────────────────── */
 
@@ -181,6 +200,10 @@ export default function App() {
     setSubmitMessage('')
     setLayoutResult(null)
     setSelectedItemId(null)
+    setAiExplanation(null)
+    setAiStatus('idle')
+    setAiError('')
+    aiRequestRef.current += 1
     try {
       const res = await fetch('/api/layout', {
         method: 'POST',
@@ -198,6 +221,7 @@ export default function App() {
       }
       setLayoutResult(data)
       setSubmittedInventory([...furniture])
+      setSubmittedStyle(style)
       setSubmitStatus('accepted')
       const placedCnt = data?.summary?.placed_count ?? 0
       const totalCnt = data?.summary?.furniture_count ?? 0
@@ -210,6 +234,48 @@ export default function App() {
     } catch (err) {
       setSubmitStatus('error')
       setSubmitMessage(err instanceof Error ? err.message : 'Submission failed')
+    }
+  }
+
+  /* ── AI Explanation (Day 5) ─────────────────────────────────────── */
+
+  async function handleExplainLayout() {
+    if (!layoutResult || aiStatus === 'loading') return
+    const requestId = ++aiRequestRef.current
+
+    const payload = {
+      room_width_cm: layoutResult.summary.room_width_cm,
+      room_length_cm: layoutResult.summary.room_length_cm,
+      room_height_cm: layoutResult.summary.room_height_cm,
+      preferences: submittedStyle ? { style: submittedStyle } : undefined,
+      placed_items: layoutResult.placed_items,
+      unplaced_items: layoutResult.unplaced_items,
+    }
+
+    setAiStatus('loading')
+    setAiError('')
+    try {
+      const res = await fetch('/api/ai/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => null)
+      if (requestId !== aiRequestRef.current) return
+
+      if (!res.ok) {
+        const detail =
+          Array.isArray(data?.detail)
+            ? data.detail.map((d: { msg?: string }) => d?.msg ?? JSON.stringify(d)).join('; ')
+            : (typeof data?.detail === 'string' && data.detail) || `HTTP ${res.status}`
+        throw new Error(detail)
+      }
+      setAiExplanation(data)
+      setAiStatus('success')
+    } catch (err) {
+      if (requestId !== aiRequestRef.current) return
+      setAiStatus('error')
+      setAiError(err instanceof Error ? err.message : 'Failed to generate AI layout explanation')
     }
   }
 
@@ -632,6 +698,120 @@ export default function App() {
                 </ul>
               </div>
             )}
+
+            {/* AI Design Explanation Card (Day 5) */}
+            <div className="rg-ai-explanation-section" id="ai-explanation-section">
+              <div className="rg-ai-header">
+                <div className="rg-ai-title-wrap">
+                  <span className="rg-sparkle-icon">✨</span>
+                  <div>
+                    <h3>Meta Muse Spark Design Critique</h3>
+                    <p className="rg-ai-subtitle">
+                      Personalized architectural commentary grounded in deterministic 2D room geometry.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="rg-btn rg-btn--primary rg-btn--ai"
+                  disabled={aiStatus === 'loading'}
+                  onClick={handleExplainLayout}
+                >
+                  {aiStatus === 'loading'
+                    ? 'Analyzing Floorplan…'
+                    : aiExplanation
+                    ? '🔄 Refresh AI Critique'
+                    : '✨ Explain Layout with Meta AI'}
+                </button>
+              </div>
+
+              {aiStatus === 'loading' && (
+                <div className="rg-ai-loading">
+                  <div className="rg-spinner" />
+                  <span>Consulting Meta Muse Spark architectural reasoning model…</span>
+                </div>
+              )}
+
+              {aiStatus === 'error' && (
+                <div className="rg-toast rg-toast--error">
+                  <strong>AI Critique Error:</strong> {aiError}
+                  <button type="button" className="rg-btn-retry" onClick={handleExplainLayout}>
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {aiExplanation && (
+                <div className="rg-ai-content">
+                  {aiExplanation.status === 'fallback' && (
+                    <div className="rg-badge rg-badge--warning" style={{ marginBottom: '14px', display: 'inline-block' }}>
+                      Deterministic Fallback Mode ({aiExplanation.model_used})
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  <div className="rg-ai-summary-box">
+                    <strong>Overview:</strong> {aiExplanation.summary}
+                  </div>
+
+                  {/* Design Reasoning */}
+                  <div className="rg-ai-block">
+                    <h4>Architectural Rationale & Space Optimization</h4>
+                    <p>{aiExplanation.design_reasoning}</p>
+                  </div>
+
+                  {/* Arrangement Tips */}
+                  {aiExplanation.arrangement_tips.length > 0 && (
+                    <div className="rg-ai-block">
+                      <h4>Physical Installation & Transit Tips</h4>
+                      <ul className="rg-ai-list">
+                        {aiExplanation.arrangement_tips.map((tip, idx) => (
+                          <li key={idx}>{tip}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Trade-offs & Clearance */}
+                  {aiExplanation.trade_offs.length > 0 && (
+                    <div className="rg-ai-block">
+                      <h4>Spatial Considerations & Trade-offs</h4>
+                      <ul className="rg-ai-list">
+                        {aiExplanation.trade_offs.map((to, idx) => (
+                          <li key={idx}>{to}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Meta Muse Spark Reasoning Trace Accordion */}
+                  {aiExplanation.reasoning_content && (
+                    <div className="rg-reasoning-trace">
+                      <button
+                        type="button"
+                        className="rg-btn-text"
+                        onClick={() => setShowReasoningTrace(!showReasoningTrace)}
+                      >
+                        {showReasoningTrace
+                          ? '▼ Hide Model Thinking Trace'
+                          : '▶ Show Meta Muse Spark Reasoning Trace'}
+                      </button>
+                      {showReasoningTrace && (
+                        <pre className="rg-reasoning-pre">
+                          {aiExplanation.reasoning_content}
+                        </pre>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="rg-ai-footer">
+                    <small>
+                      Model: <code>{aiExplanation.model_used}</code> · Deterministic geometry locked
+                    </small>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Action Bar */}
             <div className="rg-results-actions">
