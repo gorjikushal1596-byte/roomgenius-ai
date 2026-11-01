@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
 import { RoomVisualizer } from './RoomVisualizer'
+import { SegmentationDrawer, type CalibratedFurnitureItem } from './SegmentationDrawer'
+import { ImagePreviewModal } from './ImagePreviewModal'
 import './App.css'
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -245,6 +247,20 @@ export default function App() {
 
   function removeFurniture(id: string) {
     setFurniture(prev => prev.filter(item => item.id !== id))
+  }
+
+  function handleImportCalibratedFurniture(items: CalibratedFurnitureItem[]) {
+    setFurniture(prev => {
+      const existing = prev.filter(f => f.name.trim() !== '' || f.width.trim() !== '')
+      const newItems = items.map(it => ({
+        id: nextId(),
+        name: it.name,
+        width: it.width,
+        length: it.length,
+        height: it.height || '',
+      }))
+      return [...existing, ...newItems]
+    })
   }
 
   /* ── Validation ────────────────────────────────────────────────── */
@@ -499,6 +515,9 @@ export default function App() {
             />
           </label>
         </div>
+
+        {/* Meta SAM 3.1 Object Segmentation (Phase 3) */}
+        <SegmentationDrawer onImportItems={handleImportCalibratedFurniture} />
 
         {/* Furniture list */}
         <h2 style={{ marginTop: 32 }}>Furniture Items</h2>
@@ -948,6 +967,14 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* Meta Muse Image Visual Concept Preview (Phase 3) */}
+            <ImagePreviewModal
+              roomWidth={layoutResult.summary.room_width_cm}
+              roomLength={layoutResult.summary.room_length_cm}
+              style={style}
+              placedItems={layoutResult.placed_items}
+            />
 
             {/* Action Bar */}
             <div className="rg-results-actions">

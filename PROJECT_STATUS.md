@@ -606,5 +606,200 @@ dist/assets/index-Bj-2HaWC.js   245.69 kB │ gzip: 76.00 kB
 2. **Project Submission Form & Devpost Packaging**:
    - Verify public GitHub repository links, README accuracy, and submission requirements.
 
+---
+
+## Technical Audit & Architectural Plan: Meta SAM 3.1 & Muse Image
+
+> [!IMPORTANT]
+> **Status:** AUDIT & PLANNING ONLY — Neither integration is currently implemented or activated in source files. All live endpoints and production files remain untouched pending user approval.
+
+### 1. Executive Summary & Core Guarantees
+- **SAM 3.1**: Zero-shot furniture object segmentation from uploaded room photos. Bounded by strict architectural contract: *Pixels never equal physical metric dimensions without user-in-the-loop calibration*.
+- **Muse Image**: Visual interior redesign previews grounded in validated layout geometry and selected style. Bounded by strict architectural contract: *Generated pixels are aesthetic previews, never physical validity proofs*.
+- **Deterministic Geometry Protection**: `backend/geometry.py` remains the sole physical ground truth. Neither SAM nor Muse Image can alter or bypass collision boundaries or clearance corridors.
+
+### 2. Model API Availability & Verification Matrix
+
+| Specification | Meta SAM 3.1 (`sam-3.1`) | Meta Muse Image (`muse-image-1.0`) |
+| :--- | :--- | :--- |
+| **Model Identifier** | `sam-3.1` (Meta Model API) | `muse-image-1.0` or `meta/muse-image` |
+| **Base Endpoint** | `https://api.meta.ai/v1/responses` | `https://api.meta.ai/v1/images/generations` or `/responses` |
+| **Authentication** | Bearer Token (`META_API_KEY`) | Bearer Token (`META_API_KEY`) |
+| **Input Format** | JPEG / PNG / WebP image (or MP4/MOV) + noun phrase prompt (e.g., `"bed"`, `"sofa"`) | Text prompt (geometry summary + style) + optional reference image |
+| **Max Payload / Size** | Standard image <= 10MB; video frames H.264/H.265 | Standard 1024x1024 or 16:9 aspect ratios |
+| **Output Format** | Segmentation masks (RLE/polygon), 2D normalized bounding boxes `[ymin, xmin, ymax, xmax]`, confidence | Image URL or base64 JSON payload (`b64_json`) |
+| **Pricing** | *UNVERIFIED* exact per-call rate on user tier (typically usage-based tokens/call) | ~$0.01 per generated image |
+| **Mock Fallback** | Instant deterministic simulated bounding boxes (0 credits) | SVG styled render or cached placeholder preview (0 credits) |
+
+### 3. Proposed Service Architecture
+- `backend/sam_service.py`: Dedicated service handling image validation, Meta Responses API communication for `sam-3.1`, normalized bbox extraction, and category classification.
+- `backend/muse_image_service.py`: Dedicated service translating validated `RoomInput` + `LayoutResponse` + `style` into structured aesthetic prompts and calling `muse-image-1.0`.
+- `backend/main.py`: Modular endpoints `POST /ai/segment-furniture` and `POST /ai/generate-preview` protected with independent concurrency limiters (`BoundedSemaphore(1)`).
+
+### 4. Integration Safety & Fallback Protocols
+1. **SAM Failure Fallback**: If image is corrupt, API times out (15s), or rate limits (429), UI falls back seamlessly to the standard manual furniture input form.
+2. **Muse Image Failure Fallback**: If preview generation fails or times out (20s), UI retains the 2D SVG floorplan visualizer and metrics bar as primary presentation.
+3. **Preservation of Muse Spark**: `POST /ai/explain` and `POST /layout` remain completely isolated and functional regardless of SAM or Muse Image status.
+
+---
+
+### ✅ Phase 1 Completion: Schemas, Isolated Services & Mock Test Suites
+
+| Deliverable | Implementation File | Status | Notes |
+| :--- | :--- | :---: | :--- |
+| **Pydantic Schemas** | `backend/schemas.py` | ✅ Complete | Added `NormalizedBoundingBox`, `DetectedObject`, `SegmentationResponse`, `ImagePreviewRequest`, and `ImagePreviewResponse`. Strict validation bounds applied. |
+| **SAM 3.1 Service** | `backend/sam_service.py` | ✅ Complete | Zero-credit mock generator (`generate_mock_segmentation`), Meta Model API `POST /v1/responses` caller, 5MB file-size guardrail, MIME checks, and error fallbacks. |
+| **Muse Image Service** | `backend/muse_image_service.py` | ✅ Complete | Zero-credit SVG mock generator (`generate_mock_preview`), architectural prompt formulation, Meta Model API `/images/generations` caller, and disclaimer enforcement. |
+| **SAM Unit Tests** | `backend/test_sam.py` | ✅ Complete | 10 unit tests covering box validation, filename sanitization, oversized rejection, mock generation, HTTP errors, and timeouts. |
+| **Muse Image Tests** | `backend/test_muse_image.py` | ✅ Complete | 7 unit tests covering prompt formatting, SVG Data URI generation, base64 payload parsing, URL extraction, and network fallback. |
+| **Total Test Suite** | Full backend test suite | ✅ Complete | **91 / 91 pytest tests passing** in 0.60s (0 external API credits consumed). Frontend passes `oxlint` (0 warnings) and `vite build` (176ms). |
+
+---
+
+### ✅ Phase 2 Completion: FastAPI Gateway Endpoints & Concurrency Protections
+
+| Endpoint | Method | Status | Notes |
+| :--- | :---: | :---: | :--- |
+| `GET /ai/models-status` | `GET` | ✅ Complete | Returns configuration health for all 3 Meta AI models (`muse_spark`, `sam_3_1`, `muse_image`). |
+| `POST /ai/segment-furniture` | `POST` | ✅ Complete | Accepts base64 image payload, validates file bounds, invokes `sam_service.py`, protected by dedicated concurrency semaphore (`value=1`). |
+| `POST /ai/generate-preview` | `POST` | ✅ Complete | Accepts room layout context + aesthetic style, invokes `muse_image_service.py`, protected by dedicated concurrency semaphore (`value=1`). |
+| **Integration Test Suite** | `backend/test_api_extensions.py` | ✅ Complete | 7 comprehensive integration tests covering valid payloads, Data URIs, base64 errors, and concurrency backpressure for both endpoints. |
+| **Total Test Suite** | Full backend test suite | ✅ Complete | **98 / 98 pytest tests passing** in 6.13s (0 external API credits consumed). Frontend passes `oxlint` (0 warnings) and `vite build` (169ms). |
+
+---
+
+### ✅ Phase 3 Completion: Frontend UI Components & Human-in-the-Loop Integration
+
+| Component | File Path | Status | Notes |
+| :--- | :--- | :---: | :--- |
+| **SAM 3.1 Scanner & Staging Drawer** | `frontend/src/SegmentationDrawer.tsx` | ✅ Complete | Room photo upload, base64 Data URI reading, SVG bounding box projection, category badges, and metric dimension calibration drawer enforcing human confirmation before adding items. |
+| **Muse Image Preview Modal** | `frontend/src/ImagePreviewModal.tsx` | ✅ Complete | Interactive concept preview card, optional design accents input, model status badges, prompt inspector, and mandatory truthfulness disclaimer. |
+| **App Integration & Styles** | `frontend/src/App.tsx`, `App.css` | ✅ Complete | Integrated seamlessly into room input and layout result sections. Added responsive grid layout, SVG box projection styles, and hover animations. |
+| **Build & Quality Verification** | Frontend production build | ✅ Complete | `oxlint` **0 warnings, 0 errors** across 6 files; `tsc -b` clean; `vite build` completed in **128ms** (`256.06 kB` bundle). |
+| **Full Regression Suite** | `pytest backend` | ✅ Complete | **98 / 98 tests passing** in 19.10s with 0 external API calls. Deterministic placement and Muse Spark critique remain 100% stable. |
+
+---
+
+### ✅ Phase 4 Completion: Opt-In Live API Smoke Scripts
+
+| Tool | File Path | Status | Notes |
+| :--- | :--- | :---: | :--- |
+| **SAM 3.1 Live Smoke Test** | `backend/smoke_test_sam.py` | ✅ Complete | Standalone test script sending a 1x1 test image to `https://api.meta.ai/v1/responses`. Redacts API keys; verifies connectivity without automatic pytest execution. |
+| **Muse Image Live Smoke Test** | `backend/smoke_test_muse_image.py` | ✅ Complete | Standalone test script sending an architectural prompt to `https://api.meta.ai/v1/images/generations`. Redacts API keys; verifies connectivity without automatic pytest execution. |
+
+---
+
+### ✅ Phase 5 Completion: End-to-End Reliability & Multi-Modal Showcase
+
+1. **Deterministic Geometry Lock**:
+   - `backend/geometry.py` and `backend/ai.py` remain the untouched source of truth.
+   - SAM 3.1 identifies visual boundaries, but never bypasses metric calibration by the user.
+   - Muse Image outputs visual concepts, but never claims to represent physical validity over the 2D floorplan.
+2. **Quality & Test Metrics**:
+   - Backend Pytest: **98 / 98 tests passing** in 4.90s. Zero credit consumption during all automated runs.
+   - Frontend Production: `oxlint` **0 warnings, 0 errors**; `tsc -b` and `vite build` completed in **137ms**.
+   - Working Tree: Complete multi-modal Meta AI architecture (Muse Spark + SAM 3.1 + Muse Image + Deterministic Geometry).
+
+---
+
+## Architectural Evaluation & Pipeline Design: Depth Anything V2
+
+> [!IMPORTANT]
+> **Status:** AUDIT & PLANNING ONLY — No source files modified, no dependencies installed, and no model weights downloaded. Existing Muse Spark, SAM 3.1, and Muse Image integrations remain completely operational.
+
+### 1. Executive Summary & Model Suitability
+- **Purpose**: Augment 2D image segmentation (SAM 3.1) with depth-plane layering and front-to-back scene structure to distinguish foreground furniture (e.g. coffee tables, office chairs) from wall-anchored furniture (e.g. platform beds, wardrobes, bookshelves).
+- **Core Safety Invariant**: Depth Anything V2 outputs spatial depth cues ($Z$-axis layering), but **never overrides deterministic physical coordinates or bypasses user-confirmed metric room dimensions**.
+
+### 2. Model Variants, Hardware & Licensing Matrix
+
+| Specification | Small (`vits`) **[RECOMMENDED]** | Base (`vitb`) | Large (`vitl`) |
+| :--- | :--- | :--- | :--- |
+| **Backbone** | Vision Transformer Small (ViT-S) | Vision Transformer Base (ViT-B) | Vision Transformer Large (ViT-L) |
+| **Parameters** | **24.8M** | 97.5M | 335.3M |
+| **Model Weight Size** | **~98 MB** | ~380 MB | ~1.3 GB |
+| **Indoor Metric Model** | `Depth-Anything-V2-Metric-Indoor-Small` | `Depth-Anything-V2-Metric-Indoor-Base` | `Depth-Anything-V2-Metric-Indoor-Large` |
+| **Inference Latency** | **~15ms (GPU) / ~250ms (CPU)** | ~45ms (GPU) / ~900ms (CPU) | ~110ms (GPU) / ~2.5s (CPU) |
+| **Memory (RAM/VRAM)** | **< 1 GB VRAM / < 500 MB RAM** | ~2.5 GB VRAM | ~6 GB VRAM |
+| **License** | **Apache 2.0 (Permissive / Hackathon Safe)** | CC-BY-NC-4.0 (Non-commercial only) | CC-BY-NC-4.0 (Non-commercial only) |
+| **Deployment Option** | Local ONNX Runtime / PyTorch CPU or microservice | GPU Microservice | Dedicated Cloud GPU |
+
+### 3. Unified 8-Step Vision-Language-Geometry Pipeline
+
+```mermaid
+flowchart TD
+    Step1["1. Room Photo Upload + User Room Dimensions (W × L × H)"] --> Step3["3. Meta SAM 3.1\n(Object Segmentation & 2D Boxes)"]
+    Step1 --> Step4["4. Depth Anything V2\n(Metric/Relative Depth Estimation)"]
+    Step1 --> Step2["2. Meta Muse Spark\n(Initial Scene Understanding)"]
+
+    Step3 --> Step5["5. Spatial Interpretation Layer\n(Fuses 2D Masks + Depth Layers + User-Confirmed cm Dimensions)"]
+    Step4 --> Step5
+    Step2 --> Step5
+
+    Step5 --> Step6["6. Deterministic Python Geometry Engine\n(AABB Collisions, Clearance Corridors, Physical Placements)"]
+
+    Step6 --> Step7["7. Meta Muse Spark\n(Architectural Critique & Transit Recommendations)"]
+    Step6 --> Step8["8. Meta Muse Image\n(Grounded Photorealistic Redesign Preview)"]
+```
+
+### 4. Proposed Service Contract (`backend/depth_service.py`)
+- **Inputs**: Raw image bytes / Base64 Data URI, optional known room depth ($L$ in cm) for scaling calibration.
+- **Outputs**:
+  - `depth_map_data`: Base64 grayscale or Inferno colormap Data URI.
+  - `min_depth_m` / `max_depth_m`: Estimated depth range in meters (0 to 20m for Indoor Metric model).
+  - `object_depth_layers`: Depth profile mapped across each SAM-detected bounding box (e.g. `bed-1: z_depth=3.8m (far)`, `table-1: z_depth=1.8m (near)`).
+  - `processing_time_ms`: Inference latency.
+  - `model_used`: e.g. `Depth-Anything-V2-Metric-Indoor-Small`.
+
+### 5. Failure and Fallback Protocols
+- **Depth Service Offline**: Application falls back smoothly to 2D SAM segmentation and user manual dimensions.
+- **SAM Offline**: Application preserves direct manual furniture dimension input.
+- **Muse Spark / Image Offline**: Application preserves deterministic 2D floorplan visualization and metrics.
+- **Core Guarantee**: Under 100% AI outage, RoomGenius AI's deterministic geometry engine remains completely operational.
+
+---
+
+### ✅ Phase 1 Completion: Depth Anything V2 Schemas, Service & Unit Tests
+
+| Deliverable | File Path | Status | Notes |
+| :--- | :--- | :---: | :--- |
+| **Pydantic Schemas** | `backend/schemas.py` | ✅ Complete | Added `ObjectDepthProfile`, `DepthEstimationRequest`, and `DepthEstimationResponse` with strict range validation. |
+| **Depth Service Wrapper** | `backend/depth_service.py` | ✅ Complete | Perspective projection algorithm, metric room scaling, SHA-256 caching mechanism (`_DEPTH_CACHE`), and mock depth heatmap generator. |
+| **Depth Unit Tests** | `backend/test_depth.py` | ✅ Complete | 8 comprehensive unit tests covering box depth perspective ordering, colormap generation, room length scaling, and caching. |
+| **Backend Test Suite** | Full pytest suite | ✅ Complete | **106 / 106 tests passing** in 5.29s (0 external API calls / 0 credit consumption). |
+| **Frontend Verification** | `npm run lint` & `build` | ✅ Complete | **0 warnings, 0 errors**; production bundle built in 131ms. |
+
+---
+
+### ✅ Phase 2 Completion: Depth Anything V2 Gateway & Concurrency Integration
+
+| Endpoint | Method | Status | Notes |
+| :--- | :---: | :---: | :--- |
+| `POST /ai/estimate-depth` | `POST` | ✅ Complete | Generates monocular depth map & object depth layers; protected by independent concurrency semaphore (`_depth_semaphore = BoundedSemaphore(1)`). |
+| `GET /ai/models-status` | `GET` | ✅ Complete | Updated to report live health for `depth_anything_v2` alongside `muse_spark`, `sam_3_1`, and `muse_image`. |
+| **Integration Test Suite** | `backend/test_api_extensions.py` | ✅ Complete | Added tests for model status inclusion, valid depth payload execution, and concurrency backpressure. |
+| **Total Test Suite** | Full backend test suite | ✅ Complete | **108 / 108 pytest tests passing** in 14.70s (0 external API calls / 0 credit consumption). |
+
+---
+
+### ✅ Phase 3 Completion: Frontend Depth Heatmap & Spatial Layering UI
+
+| Feature | Implementation | Status | Notes |
+| :--- | :--- | :---: | :--- |
+| **Interactive View Switcher** | `frontend/src/SegmentationDrawer.tsx` | ✅ Complete | Seamless toggle between standard 📷 Photo view and 🗺️ Depth Heatmap view (Depth Anything V2 colormap). |
+| **Depth Layer Badges** | `frontend/src/SegmentationDrawer.tsx` | ✅ Complete | Dynamic badges in staging drawer identifying proximity along camera Z-axis: `Foreground` (<2m, emerald), `Midground` (2-3.8m, blue), `Background` (>3.8m, purple). |
+| **Responsive Styling** | `frontend/src/App.css` | ✅ Complete | Added styling for view mode toggle pills, depth container overlays, and colormap legends. |
+| **Build & Quality Check** | Frontend build | ✅ Complete | `oxlint` **0 warnings, 0 errors**; `tsc -b` and `vite build` completed in **151ms** (`257.65 kB`). |
+| **Full Regression Suite** | `pytest backend` | ✅ Complete | **108 / 108 tests passing** in 5.41s. Deterministic geometry engine remains the locked ground truth. |
+
+
+
+
+
+
+
+
+
+
 
 

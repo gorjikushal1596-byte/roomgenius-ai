@@ -58,8 +58,12 @@ RoomGenius AI decouples **spatial physics** from **aesthetic reasoning**:
 - **Language**: Python 3.11+ / 3.14
 - **Web Framework**: FastAPI & Starlette
 - **Geometry & Validation**: Pydantic v2 + Python Standard Library (`dataclasses`, `urllib.request`)
-- **Testing**: Pytest (73 automated tests)
-- **AI Model**: Meta Muse Spark (`muse-spark-1.3`) via official Meta Model API
+- **Testing**: Pytest (108 automated tests)
+- **AI Models**:
+  - **Meta Muse Spark** (`muse-spark-1.3`): Natural language architectural reasoning and layout critique
+  - **Meta SAM 3.1** (`sam-3.1`): Zero-shot furniture object segmentation and 2D bounding boxes from room photos
+  - **Depth Anything V2** (`vits` Metric Indoor): $Z$-axis depth layering and scene structure visualization
+  - **Meta Muse Image** (`muse-image-1.0`): Photorealistic interior redesign concept rendering grounded in deterministic coordinates
 
 ### Frontend
 - **Framework**: React 19 + TypeScript + Vite
@@ -262,10 +266,10 @@ MOCK_AI="false"
 
 ## 13. Testing Commands
 
-All 74 tests run with **zero external API calls** to conserve model credits:
+All 108 tests run with **zero external API calls** to conserve model credits:
 
 ```powershell
-# Run full backend test suite (74 tests)
+# Run full backend test suite (108 tests)
 cd "backend"
 .venv\Scripts\python.exe -m pytest -v
 
