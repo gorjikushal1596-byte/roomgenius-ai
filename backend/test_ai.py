@@ -244,3 +244,66 @@ def test_api_explain_graceful_fallback_on_timeout(sample_explanation_request):
             assert res.status == "fallback"
             assert "fallback-due-to-network-error" in res.model_used
 
+
+def test_api_explain_handles_malformed_model_json(sample_explanation_request):
+    """Verify schema-invalid model JSON returns labeled fallback without misreporting network error."""
+    # Model returns JSON with invalid types (e.g., arrangement_tips is a number instead of a list)
+    fake_payload = json.dumps({
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "message": {
+                    "content": '{"summary": "A cozy bedroom layout", "arrangement_tips": 12345}',
+                    "reasoning_content": "Model thinking steps...",
+                },
+            }
+        ]
+    }).encode("utf-8")
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = fake_payload
+
+        with patch("ai._get_env_config") as mock_cfg:
+            mock_cfg.return_value = {
+                "api_key": "dummy-key",
+                "base_url": "https://api.meta.ai/v1",
+                "model": "muse-spark-1.3",
+                "mock_mode": False,
+            }
+            res = generate_layout_explanation(sample_explanation_request)
+            assert res.status == "fallback"
+            assert res.model_used == "fallback-due-to-unparseable-response"
+            assert len(res.arrangement_tips) > 0
+
+
+def test_api_explain_handles_truncated_model_response(sample_explanation_request):
+    """Verify finish_reason='length' returns labeled truncation fallback."""
+    fake_payload = json.dumps({
+        "choices": [
+            {
+                "finish_reason": "length",
+                "message": {
+                    "content": '{"summary": "A cozy room with platform',
+                    "reasoning_content": "Model ran out of tokens...",
+                },
+            }
+        ]
+    }).encode("utf-8")
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = fake_payload
+
+        with patch("ai._get_env_config") as mock_cfg:
+            mock_cfg.return_value = {
+                "api_key": "dummy-key",
+                "base_url": "https://api.meta.ai/v1",
+                "model": "muse-spark-1.3",
+                "mock_mode": False,
+            }
+            res = generate_layout_explanation(sample_explanation_request)
+            assert res.status == "fallback"
+            assert res.model_used == "fallback-due-to-token-truncation"
+            assert "truncated" in res.reasoning_content
+
+
+

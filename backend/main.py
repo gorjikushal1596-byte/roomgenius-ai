@@ -7,8 +7,10 @@ RoomGenius AI — FastAPI application entry point.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import threading
+
 from geometry import generate_layout
-from ai import generate_layout_explanation, is_ai_configured
+from ai import generate_layout_explanation, generate_mock_explanation, is_ai_configured
 from schemas import (
     LayoutExplanationRequest,
     LayoutExplanationResponse,
@@ -22,11 +24,16 @@ app = FastAPI(
     version="0.3.0",
 )
 
-# Allow Vite dev server (port 5173) to call the API during development.
+# Allow Vite dev server (port 5173) and preview server (port 4173) to call the API during development.
 # In production this should be replaced with the actual domain.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,6 +84,11 @@ def get_ai_status():
     return {"configured": is_ai_configured()}
 
 
+# Concurrency limiter to protect worker threads and API credit limits
+AI_CONCURRENCY_LIMIT = 2
+_ai_semaphore = threading.BoundedSemaphore(value=AI_CONCURRENCY_LIMIT)
+
+
 @app.post("/ai/explain", response_model=LayoutExplanationResponse, tags=["ai"])
 def explain_layout(request: LayoutExplanationRequest):
     """
@@ -84,7 +96,23 @@ def explain_layout(request: LayoutExplanationRequest):
 
     Interprets natural language preferences and layout geometry using
     Meta Muse Spark (or deterministic fallback when offline or in mock mode).
+    Protected by concurrency limiter to prevent threadpool starvation.
     Strictly preserves deterministic coordinates.
     """
-    return generate_layout_explanation(request)
+    acquired = _ai_semaphore.acquire(blocking=False)
+    if not acquired:
+        fallback = generate_mock_explanation(request)
+        fallback.status = "fallback"
+        fallback.model_used = "fallback-server-busy"
+        fallback.reasoning_content = (
+            "The AI explanation service is currently handling peak requests. "
+            "Showing instant deterministic layout critique."
+        )
+        return fallback
+
+    try:
+        return generate_layout_explanation(request)
+    finally:
+        _ai_semaphore.release()
+
 

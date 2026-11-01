@@ -713,7 +713,7 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  className="rg-btn rg-btn--primary rg-btn--ai"
+                  className="rg-btn rg-btn--ai"
                   disabled={aiStatus === 'loading'}
                   onClick={handleExplainLayout}
                 >
@@ -793,8 +793,8 @@ export default function App() {
                         onClick={() => setShowReasoningTrace(!showReasoningTrace)}
                       >
                         {showReasoningTrace
-                          ? '▼ Hide Model Thinking Trace'
-                          : '▶ Show Meta Muse Spark Reasoning Trace'}
+                          ? '▼ Hide Details'
+                          : '▶ Show Details'}
                       </button>
                       {showReasoningTrace && (
                         <pre className="rg-reasoning-pre">

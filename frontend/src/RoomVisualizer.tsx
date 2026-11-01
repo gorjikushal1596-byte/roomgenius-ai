@@ -79,10 +79,10 @@ export const RoomVisualizer: React.FC<RoomVisualizerProps> = ({
             <path d={`M ${20 * S} 0 L 0 0 0 ${20 * S}`} fill="none" stroke="#f1f5f9" strokeWidth={0.8 * S} />
           </pattern>
           {/* Dimension arrow markers */}
-          <marker id="arrow-start" viewBox="0 0 10 10" refX="5" refY="5" markerWidth={6 * S} markerHeight={6 * S} orient="auto-start-reverse">
+          <marker id="arrow-start" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth={7 * S} markerHeight={7 * S} orient="auto-start-reverse">
             <path d="M 10 2 L 0 5 L 10 8 z" fill="#64748b" />
           </marker>
-          <marker id="arrow-end" viewBox="0 0 10 10" refX="5" refY="5" markerWidth={6 * S} markerHeight={6 * S} orient="auto">
+          <marker id="arrow-end" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth={7 * S} markerHeight={7 * S} orient="auto">
             <path d="M 0 2 L 10 5 L 0 8 z" fill="#64748b" />
           </marker>
         </defs>

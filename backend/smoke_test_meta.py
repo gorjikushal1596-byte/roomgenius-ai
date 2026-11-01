@@ -47,7 +47,7 @@ payload = {
 
 print(f"Calling {BASE_URL}/chat/completions")
 print(f"Model  : {MODEL}")
-print(f"Key    : {API_KEY[:8]}...{API_KEY[-4:] if len(API_KEY) > 12 else ''}")
+print(f"Key    : set ({len(API_KEY)} chars)")
 
 req = urllib.request.Request(
     url=f"{BASE_URL}/chat/completions",

@@ -14,8 +14,8 @@ from pydantic import BaseModel, Field, field_validator
 
 class FurnitureItem(BaseModel):
     """One piece of furniture to be placed in the room."""
-    id: str = Field(..., min_length=1, description="Stable unique identifier, e.g. 'chair-1'")
-    name: str = Field(..., min_length=1, description="Descriptive name, e.g. 'Sofa' or 'Queen Bed'")
+    id: str = Field(..., min_length=1, max_length=100, description="Stable unique identifier, e.g. 'chair-1'")
+    name: str = Field(..., min_length=1, max_length=200, description="Descriptive name, e.g. 'Sofa' or 'Queen Bed'")
     width: float = Field(..., gt=0, le=2000, description="Width in cm (left-right)")
     length: float = Field(..., gt=0, le=2000, description="Depth in cm (front-back)")
     height: Optional[float] = Field(None, gt=0, le=500, description="Height in cm (optional)")
@@ -67,8 +67,8 @@ class RoomInput(BaseModel):
 
 class PlacedFurnitureItem(BaseModel):
     """Details of a placed or evaluated furniture item."""
-    id: str
-    name: str
+    id: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=200)
     placed: bool
     x: Optional[float] = None
     y: Optional[float] = None
@@ -77,7 +77,7 @@ class PlacedFurnitureItem(BaseModel):
     height: Optional[float] = None
     rotation: int = 0
     within_bounds: bool = False
-    rejection_reason: Optional[str] = None
+    rejection_reason: Optional[str] = Field(default=None, max_length=300)
 
 
 class LayoutResponse(BaseModel):

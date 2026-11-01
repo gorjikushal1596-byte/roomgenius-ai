@@ -12,10 +12,13 @@ mocking for credit conservation and testing.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
@@ -24,15 +27,33 @@ try:
 except ImportError:
     pass
 
+from pydantic import ValidationError
+
 from schemas import LayoutExplanationRequest, LayoutExplanationResponse
 
 
 def _get_env_config() -> dict[str, str]:
-    """Retrieve Meta Model API configuration from environment."""
-    api_key = os.getenv("META_API_KEY") or os.getenv("BASETEN_API_KEY") or ""
-    base_url = os.getenv("META_BASE_URL") or "https://api.meta.ai/v1"
-    model = os.getenv("META_MODEL") or "muse-spark-1.3"
+    """
+    Retrieve Meta Model API configuration from environment.
+    Guarantees Baseten credentials are never sent to the Meta endpoint.
+    """
+    meta_key = os.getenv("META_API_KEY", "").strip()
+    baseten_key = os.getenv("BASETEN_API_KEY", "").strip()
     mock_mode = os.getenv("MOCK_AI", "false").lower() in ("true", "1", "yes")
+
+    if meta_key:
+        api_key = meta_key
+        base_url = os.getenv("META_BASE_URL", "https://api.meta.ai/v1")
+        model = os.getenv("META_MODEL", "muse-spark-1.3")
+    elif baseten_key and os.getenv("BASETEN_BASE_URL"):
+        api_key = baseten_key
+        base_url = os.getenv("BASETEN_BASE_URL")
+        model = os.getenv("BASETEN_MODEL", "meta-models/muse-spark-open")
+    else:
+        api_key = ""
+        base_url = os.getenv("META_BASE_URL", "https://api.meta.ai/v1")
+        model = os.getenv("META_MODEL", "muse-spark-1.3")
+
     return {
         "api_key": api_key,
         "base_url": base_url.rstrip("/"),
@@ -207,32 +228,42 @@ def generate_layout_explanation(
             raw_content = (message.get("content") or "").strip()
             reasoning_content = (message.get("reasoning_content") or "").strip()
 
+            finish_reason = choice.get("finish_reason")
+            if finish_reason == "length":
+                logger.warning("Meta API response truncated (finish_reason=length)")
+                fallback = generate_mock_explanation(req)
+                fallback.status = "fallback"
+                fallback.model_used = "fallback-due-to-token-truncation"
+                fallback.reasoning_content = (
+                    "Remote AI response was truncated by token limit. Showing deterministic explanation."
+                )
+                return fallback
+
             # Attempt to parse structured JSON from the model response
             parsed = _parse_model_json(raw_content)
             if parsed:
-                return LayoutExplanationResponse(
-                    status="success",
-                    summary=parsed.get("summary", "Personalized room arrangement generated."),
-                    design_reasoning=parsed.get("design_reasoning", raw_content),
-                    arrangement_tips=parsed.get("arrangement_tips", []),
-                    trade_offs=parsed.get("trade_offs", []),
-                    model_used=config["model"],
-                    reasoning_content=reasoning_content or None,
-                )
+                try:
+                    return LayoutExplanationResponse(
+                        status="success",
+                        summary=parsed.get("summary") or "Personalized room arrangement generated.",
+                        design_reasoning=parsed.get("design_reasoning") or raw_content,
+                        arrangement_tips=parsed.get("arrangement_tips", []),
+                        trade_offs=parsed.get("trade_offs", []),
+                        model_used=config["model"],
+                        reasoning_content=reasoning_content or None,
+                    )
+                except ValidationError as ve:
+                    logger.warning("Meta API returned schema-invalid JSON: %s", ve)
 
-            # Fallback if content was freeform text rather than JSON
-            return LayoutExplanationResponse(
-                status="success",
-                summary="AI layout analysis completed.",
-                design_reasoning=raw_content or "Layout arrangement analyzed.",
-                arrangement_tips=[
-                    "Check electrical outlet access behind large furniture pieces.",
-                    "Ensure main door swing path remains unobstructed.",
-                ],
-                trade_offs=["Spatial distribution preserves primary transit corridors."],
-                model_used=config["model"],
-                reasoning_content=reasoning_content or None,
+            # Unparseable or malformed model output: use labeled deterministic fallback
+            logger.warning("Meta API returned unparseable content (finish_reason=%s)", finish_reason)
+            fallback = generate_mock_explanation(req)
+            fallback.status = "fallback"
+            fallback.model_used = "fallback-due-to-unparseable-response"
+            fallback.reasoning_content = (
+                "Remote AI response could not be parsed into structured format. Showing deterministic explanation."
             )
+            return fallback
 
     except urllib.error.HTTPError as e:
         error_body = ""
@@ -240,18 +271,19 @@ def generate_layout_explanation(
             error_body = e.read().decode("utf-8")[:300]
         except Exception:
             pass
-        # Graceful fallback so user is never stranded
+        logger.warning("Meta API HTTP %s: %s", e.code, error_body)
         fallback = generate_mock_explanation(req)
         fallback.status = "fallback"
         fallback.model_used = f"fallback-due-to-http-{e.code}"
-        fallback.reasoning_content = f"Remote API returned HTTP {e.code}: {error_body}"
+        fallback.reasoning_content = f"Remote AI provider returned HTTP {e.code}. Showing deterministic explanation."
         return fallback
 
     except Exception as exc:
+        logger.warning("Meta API request failed: %s", exc)
         fallback = generate_mock_explanation(req)
         fallback.status = "fallback"
         fallback.model_used = "fallback-due-to-network-error"
-        fallback.reasoning_content = f"Network or execution exception: {str(exc)}"
+        fallback.reasoning_content = "Remote AI provider was unreachable. Showing deterministic explanation."
         return fallback
 
 
