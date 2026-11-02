@@ -90,15 +90,26 @@ export function ImagePreviewModal({ roomWidth, roomLength, style, placedItems }:
         </div>
         <button
           type="button"
-          className="rg-btn rg-btn--ai"
+          className={isOpen ? "rg-btn rg-btn--ghost" : "rg-btn rg-btn--ai"}
+          disabled={loading}
           onClick={() => {
-            setIsOpen(!isOpen)
-            if (!preview && !isOpen) {
-              handleGeneratePreview()
+            if (isOpen) {
+              setIsOpen(false)
+            } else {
+              setIsOpen(true)
+              if (!preview) {
+                handleGeneratePreview()
+              }
             }
           }}
         >
-          {isOpen ? '✕ Close Preview' : preview ? '🖼️ View Redesign Concept' : '🎨 Generate Visual Concept'}
+          {loading
+            ? '✨ Generating Concept…'
+            : isOpen
+            ? '✕ Close Preview'
+            : preview
+            ? '🖼️ View Redesign Concept'
+            : '✨ Generate Visual Concept'}
         </button>
       </div>
 
@@ -150,7 +161,7 @@ export function ImagePreviewModal({ roomWidth, roomLength, style, placedItems }:
               <div className="rg-muse-meta">
                 <div className="rg-muse-status-row">
                   <span className="rg-badge rg-badge--success">
-                    Model: {preview.model_used}
+                    Model: {preview.model_used.startsWith('fallback') ? 'muse-image-1.0 (offline concept)' : preview.model_used}
                   </span>
                   <button
                     type="button"

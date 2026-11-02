@@ -149,13 +149,21 @@ def generate_interior_preview(
         logger.info("Using mock Muse Image preview for style '%s'", req.style)
         return generate_mock_preview(req)
 
-    # Construct OpenAI-compatible image generations payload
+    # Construct Meta Model API Responses payload for muse-image-1.0
     payload = {
-        "model": "meta/muse-image",
-        "prompt": prompt,
-        "n": 1,
-        "size": "1024x1024",
-        "response_format": "b64_json",
+        "model": "muse-image-1.0",
+        "stream": False,
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": prompt,
+                    }
+                ],
+            }
+        ],
     }
 
     req_data = json.dumps(payload).encode("utf-8")
@@ -165,7 +173,7 @@ def generate_interior_preview(
         "User-Agent": "RoomGeniusAI/0.3.0",
     }
 
-    endpoint = f"{config['base_url']}/images/generations"
+    endpoint = f"{config['base_url']}/responses"
 
     try:
         http_req = urllib.request.Request(endpoint, data=req_data, headers=headers, method="POST")
@@ -178,15 +186,33 @@ def generate_interior_preview(
         format_type = "b64_json"
 
         if isinstance(resp_json, dict):
-            data_arr = resp_json.get("data", [])
-            if data_arr and isinstance(data_arr[0], dict):
-                first = data_arr[0]
-                if "b64_json" in first:
-                    image_data = f"data:image/png;base64,{first['b64_json']}"
-                    format_type = "b64_json"
-                elif "url" in first:
-                    image_data = first["url"]
-                    format_type = "url"
+            # 1. Native Meta Model API /responses structure (image_generation_call)
+            for item in resp_json.get("output", []):
+                if isinstance(item, dict) and item.get("type") in ("image_generation_call", "image"):
+                    res_val = item.get("result", "")
+                    if isinstance(res_val, str) and res_val.strip():
+                        if res_val.startswith("data:image"):
+                            image_data = res_val
+                        elif res_val.startswith("http://") or res_val.startswith("https://"):
+                            image_data = res_val
+                            format_type = "url"
+                        else:
+                            # Base64 WebP image data
+                            image_data = f"data:image/webp;base64,{res_val.strip()}"
+                            format_type = "b64_json"
+                        break
+
+            # 2. Compatibility check for OpenAI-style responses (for mocks and unit tests)
+            if not image_data:
+                data_arr = resp_json.get("data", [])
+                if data_arr and isinstance(data_arr[0], dict):
+                    first = data_arr[0]
+                    if "b64_json" in first:
+                        image_data = f"data:image/png;base64,{first['b64_json']}"
+                        format_type = "b64_json"
+                    elif "url" in first:
+                        image_data = first["url"]
+                        format_type = "url"
 
         if not image_data:
             logger.warning("Muse Image returned no valid image payload; using mock preview fallback")

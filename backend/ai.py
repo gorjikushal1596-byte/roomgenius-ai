@@ -202,7 +202,7 @@ def generate_layout_explanation(
             {"role": "user", "content": user_prompt},
         ],
         "temperature": 0.2,
-        "max_tokens": 1200,
+        "max_tokens": 2500,
         "reasoning_effort": "low",
         "stream": False,
     }
@@ -227,19 +227,9 @@ def generate_layout_explanation(
             message = choice.get("message", {})
             raw_content = (message.get("content") or "").strip()
             reasoning_content = (message.get("reasoning_content") or "").strip()
-
             finish_reason = choice.get("finish_reason")
-            if finish_reason == "length":
-                logger.warning("Meta API response truncated (finish_reason=length)")
-                fallback = generate_mock_explanation(req)
-                fallback.status = "fallback"
-                fallback.model_used = "fallback-due-to-token-truncation"
-                fallback.reasoning_content = (
-                    "Remote AI response was truncated by token limit. Showing deterministic explanation."
-                )
-                return fallback
 
-            # Attempt to parse structured JSON from the model response
+            # 1. Attempt to parse structured JSON from the model response first
             parsed = _parse_model_json(raw_content)
             summary_val = parsed.get("summary") if parsed else None
             reasoning_val = parsed.get("design_reasoning") if parsed else None
@@ -263,6 +253,17 @@ def generate_layout_explanation(
                     )
                 except ValidationError as ve:
                     logger.warning("Meta API returned schema-invalid JSON: %s", ve)
+
+            # 2. Check for length truncation if unparseable
+            if finish_reason == "length":
+                logger.warning("Meta API response truncated (finish_reason=length)")
+                fallback = generate_mock_explanation(req)
+                fallback.status = "fallback"
+                fallback.model_used = "fallback-due-to-token-truncation"
+                fallback.reasoning_content = (
+                    "Remote AI response was truncated by token limit. Showing deterministic explanation."
+                )
+                return fallback
 
             # Unparseable or malformed model output: use labeled deterministic fallback
             logger.warning("Meta API returned unparseable content (finish_reason=%s)", finish_reason)

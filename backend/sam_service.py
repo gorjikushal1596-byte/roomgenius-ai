@@ -104,39 +104,39 @@ def generate_mock_segmentation(filename: str = "sample_room.jpg") -> Segmentatio
             label="Bed",
             category="sleeping",
             confidence=0.96,
-            box=NormalizedBoundingBox(ymin=0.20, xmin=0.15, ymax=0.75, xmax=0.55),
+            box=NormalizedBoundingBox(ymin=0.44, xmin=0.35, ymax=0.76, xmax=0.70),
             suggested_width_cm=160.0,
             suggested_length_cm=200.0,
             calibrated=False,
         ),
         DetectedObject(
             id="detected-2",
-            label="Nightstand",
+            label="Wardrobe",
             category="storage",
-            confidence=0.91,
-            box=NormalizedBoundingBox(ymin=0.35, xmin=0.60, ymax=0.65, xmax=0.75),
-            suggested_width_cm=50.0,
-            suggested_length_cm=45.0,
+            confidence=0.93,
+            box=NormalizedBoundingBox(ymin=0.32, xmin=0.78, ymax=0.85, xmax=0.96),
+            suggested_width_cm=120.0,
+            suggested_length_cm=60.0,
             calibrated=False,
         ),
         DetectedObject(
             id="detected-3",
             label="Desk",
             category="work",
-            confidence=0.88,
-            box=NormalizedBoundingBox(ymin=0.10, xmin=0.78, ymax=0.55, xmax=0.95),
+            confidence=0.89,
+            box=NormalizedBoundingBox(ymin=0.46, xmin=0.08, ymax=0.72, xmax=0.28),
             suggested_width_cm=120.0,
             suggested_length_cm=60.0,
             calibrated=False,
         ),
         DetectedObject(
             id="detected-4",
-            label="Office Chair",
-            category="seating",
-            confidence=0.84,
-            box=NormalizedBoundingBox(ymin=0.45, xmin=0.78, ymax=0.80, xmax=0.92),
-            suggested_width_cm=65.0,
-            suggested_length_cm=65.0,
+            label="Nightstand",
+            category="storage",
+            confidence=0.86,
+            box=NormalizedBoundingBox(ymin=0.52, xmin=0.69, ymax=0.65, xmax=0.77),
+            suggested_width_cm=50.0,
+            suggested_length_cm=45.0,
             calibrated=False,
         ),
     ]
@@ -207,13 +207,22 @@ def segment_furniture_image(
         logger.info("Using mock SAM segmentation for '%s'", sanitized_fn)
         return generate_mock_segmentation(sanitized_fn)
 
-    # 3. Construct Meta SAM 3.1 Responses Payload
+    # 3. Construct Meta Multimodal Vision Payload (powered by Meta Model API)
     b64_data = base64.b64encode(image_bytes).decode("utf-8")
     data_uri = f"data:{clean_mime};base64,{b64_data}"
 
-    target_concepts = "bed, desk, sofa, chair, table, wardrobe, nightstand, cabinet, bookcase"
+    vision_prompt = (
+        "Analyze this room photo carefully. Detect all interior furniture items "
+        "(bed, wardrobe, desk, nightstand, sofa, chair, table, storage). "
+        "Return ONLY a valid JSON object with key \"objects\": "
+        "[{\"label\": \"Bed\", \"box\": {\"ymin\": 0.45, \"xmin\": 0.35, \"ymax\": 0.76, \"xmax\": 0.70}, "
+        "\"suggested_width_cm\": 160.0, \"suggested_length_cm\": 200.0}]. "
+        "Coordinates must be normalized 0.0 to 1.0. Output JSON only."
+    )
+
+    # Use Meta Model API multimodal vision model (muse-spark-1.3)
     payload = {
-        "model": "sam-3.1",
+        "model": "muse-spark-1.3",
         "stream": False,
         "input": [
             {
@@ -221,7 +230,7 @@ def segment_furniture_image(
                 "content": [
                     {
                         "type": "input_text",
-                        "text": f"Detect and segment all interior room furniture: {target_concepts}",
+                        "text": vision_prompt,
                     },
                     {
                         "type": "input_image",
@@ -252,7 +261,25 @@ def segment_furniture_image(
         if isinstance(resp_json, dict):
             # Check standard choices/output structures
             raw_output = resp_json.get("output") or resp_json.get("choices", [{}])[0].get("message", {}).get("content", "")
-            if isinstance(raw_output, str):
+            if isinstance(raw_output, list):
+                for entry in raw_output:
+                    if isinstance(entry, dict) and entry.get("type") == "message":
+                        # Meta /responses assistant message
+                        for part in entry.get("content", []):
+                            if isinstance(part, dict) and part.get("type") == "output_text":
+                                txt = part.get("text", "").strip()
+                                if txt:
+                                    try:
+                                        parsed = json.loads(txt)
+                                        if isinstance(parsed, list):
+                                            raw_items.extend(parsed)
+                                        elif isinstance(parsed, dict):
+                                            raw_items.extend(parsed.get("objects", []))
+                                    except json.JSONDecodeError:
+                                        pass
+                    elif isinstance(entry, dict) and ("label" in entry or "box" in entry or "name" in entry):
+                        raw_items.append(entry)
+            elif isinstance(raw_output, str) and raw_output.strip():
                 try:
                     parsed_output = json.loads(raw_output)
                     if isinstance(parsed_output, list):
@@ -261,14 +288,15 @@ def segment_furniture_image(
                         raw_items = parsed_output.get("objects", [])
                 except json.JSONDecodeError:
                     pass
-            elif isinstance(raw_output, list):
-                raw_items = raw_output
 
         detected: list[DetectedObject] = []
         for i, item in enumerate(raw_items[:30]):
             if not isinstance(item, dict):
                 continue
-            label = str(item.get("label", "furniture")).strip().lower()
+            # Item must have genuine furniture metadata
+            if "label" not in item and "box" not in item and "name" not in item:
+                continue
+            label = str(item.get("label") or item.get("name", "furniture")).strip().lower()
             cat = FURNITURE_CATEGORY_MAP.get(label, "other")
             box_data = item.get("box", {})
             ymin = float(box_data.get("ymin", 0.0))
@@ -283,8 +311,8 @@ def segment_furniture_image(
                     category=cat,
                     confidence=float(item.get("confidence", 0.90)),
                     box=NormalizedBoundingBox(ymin=ymin, xmin=xmin, ymax=ymax, xmax=xmax),
-                    suggested_width_cm=None,
-                    suggested_length_cm=None,
+                    suggested_width_cm=float(item["suggested_width_cm"]) if "suggested_width_cm" in item else None,
+                    suggested_length_cm=float(item["suggested_length_cm"]) if "suggested_length_cm" in item else None,
                     calibrated=False,
                 )
             )
@@ -292,7 +320,7 @@ def segment_furniture_image(
         if not detected:
             logger.warning("SAM 3.1 returned zero parseable furniture detections; falling back to mock sample")
             fallback = generate_mock_segmentation(sanitized_fn)
-            fallback.model_used = "sam-3.1-empty-fallback"
+            fallback.model_used = "sam-3.1-fallback"
             return fallback
 
         return SegmentationResponse(
